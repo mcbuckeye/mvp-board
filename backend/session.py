@@ -61,7 +61,9 @@ async def _get_rag_context(db: DBSession | None, advisor_id: str, question: str)
 
 
 async def _ask_advisor(advisor: advisors.Advisor, question: str, db: DBSession | None = None) -> dict:
-    rag_context = await _get_rag_context(db, advisor.id, question)
+    # RAG disabled in parallel calls due to SQLAlchemy greenlet conflicts
+    # TODO: pre-fetch RAG contexts sequentially before parallel LLM calls
+    rag_context = ""
 
     user_content = question
     if rag_context:
@@ -155,7 +157,8 @@ async def _deliberate_advisor(
     round_num: int,
     db: DBSession | None = None,
 ) -> dict:
-    rag_context = await _get_rag_context(db, advisor.id, question)
+    # Skip RAG for deliberation — advisors already have full debate context
+    rag_context = ""
 
     others_text = "\n\n".join(
         f"[{r['name']}] ({r['domain']}): {r['response']}"
