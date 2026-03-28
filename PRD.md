@@ -1,4 +1,4 @@
-# MVP Board — Personal AI Board of Directors
+# ConveneAgent — Personal AI Board of Directors
 
 ## Overview
 A web app that gives you an always-available virtual board of directors — iconic thinkers and leaders modeled as AI personas. Submit a question, select which board members to consult, and get multi-perspective advisory responses in a structured "board session" format.

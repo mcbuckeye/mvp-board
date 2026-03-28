@@ -28,6 +28,7 @@ class User(Base):
 
     sessions: Mapped[list[Session]] = relationship(back_populates="user", cascade="all, delete-orphan")
     custom_advisors: Mapped[list[CustomAdvisor]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    profiles: Mapped[list[UserProfile]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Session(Base):
@@ -55,6 +56,20 @@ class SessionResponse(Base):
     round: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     session: Mapped[Session] = relationship(back_populates="responses")
+
+
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: uuid.uuid4().hex)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    profile_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+
+    user: Mapped[User] = relationship(back_populates="profiles")
 
 
 class CustomAdvisor(Base):

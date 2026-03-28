@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Advisor, Session, SessionSummary } from "./types";
+import type { Advisor, Session, SessionSummary, UserProfile } from "./types";
 import * as api from "./api";
 import { useAuth } from "./AuthContext";
 import { useIsMobile } from "./hooks/useMediaQuery";
@@ -10,6 +10,7 @@ import QuestionForm from "./components/QuestionForm";
 import SessionView from "./components/SessionView";
 import SessionHistory from "./components/SessionHistory";
 import BottomDrawer from "./components/BottomDrawer";
+import ProfilesPage from "./components/ProfilesPage";
 import "./App.css";
 
 export default function App() {
@@ -71,11 +72,18 @@ function Board({
   const [drawerOpen, setDrawerOpen] = useState<"board" | "history" | null>(null);
   const [deliberating, setDeliberating] = useState(false);
   const [generatingConsensus, setGeneratingConsensus] = useState(false);
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [view, setView] = useState<"board" | "profiles">("board");
 
   useEffect(() => {
     api.fetchAdvisors().then(setAdvisors);
     api.fetchSessions().then(setHistory);
+    api.fetchProfiles().then(setProfiles);
   }, []);
+
+  const refreshProfiles = () => {
+    api.fetchProfiles().then(setProfiles);
+  };
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -88,11 +96,15 @@ function Board({
 
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (question: string) => {
+  const handleSubmit = async (question: string, profileIds: string[]) => {
     setLoading(true);
     setError(null);
     try {
-      const session = await api.createSession(question, [...selected]);
+      const session = await api.createSession(
+        question,
+        [...selected],
+        profileIds.length > 0 ? profileIds : undefined
+      );
       if (session && session.responses) {
         setCurrentSession(session);
         const updated = await api.fetchSessions();
@@ -144,6 +156,28 @@ function Board({
       setGeneratingConsensus(false);
     }
   };
+
+  // Profiles view
+  if (view === "profiles") {
+    return (
+      <div
+        style={{
+          height: "100vh",
+          background: "#0d0d0d",
+          color: "#eee",
+          fontFamily: "'Inter', sans-serif",
+          overflowY: "auto",
+        }}
+      >
+        <ProfilesPage
+          onBack={() => {
+            refreshProfiles();
+            setView("board");
+          }}
+        />
+      </div>
+    );
+  }
 
   const responseContent = (
     <>
@@ -249,13 +283,20 @@ function Board({
       >
         {/* Mobile header bar */}
         <div className="mobile-header" style={{ display: "flex" }}>
-          <h1 className="mobile-header-title">MVP Board</h1>
+          <h1 className="mobile-header-title">ConveneAgent</h1>
           <div className="mobile-header-actions">
             <button
               className="mobile-header-btn"
               onClick={() => setDrawerOpen(drawerOpen === "board" ? null : "board")}
             >
               Board{selected.size > 0 ? ` (${selected.size})` : ""}
+            </button>
+            <button
+              className="mobile-header-btn"
+              onClick={() => setView("profiles")}
+              title="Profiles"
+            >
+              Profiles
             </button>
             <button
               className="mobile-header-btn"
@@ -276,6 +317,7 @@ function Board({
             selectedCount={selected.size}
             loading={loading}
             onSubmit={handleSubmit}
+            profiles={profiles}
           />
         </div>
 
@@ -308,7 +350,7 @@ function Board({
     );
   }
 
-  // Desktop layout (unchanged)
+  // Desktop layout
   return (
     <div
       style={{
@@ -341,7 +383,7 @@ function Board({
           }}
         >
           <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#A78BFA" }}>
-            MVP Board
+            ConveneAgent
           </h1>
           <button
             onClick={() => setShowHistory(!showHistory)}
@@ -369,6 +411,52 @@ function Board({
           ) : (
             <BoardRoster advisors={advisors} selected={selected} onToggle={toggle} />
           )}
+        </div>
+
+        {/* Profiles button */}
+        <div
+          style={{
+            padding: "8px 14px",
+            borderTop: "1px solid #222",
+          }}
+        >
+          <button
+            onClick={() => setView("profiles")}
+            style={{
+              width: "100%",
+              padding: "8px 12px",
+              borderRadius: 6,
+              border: "1px solid #333",
+              background: "transparent",
+              color: "#A78BFA",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: "Inter, sans-serif",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              justifyContent: "center",
+              transition: "border-color 0.2s",
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.borderColor = "#7C3AED")}
+            onMouseOut={(e) => (e.currentTarget.style.borderColor = "#333")}
+          >
+            <span style={{ fontSize: 14 }}>{"\u{1F464}"}</span> My Profiles
+            {profiles.length > 0 && (
+              <span
+                style={{
+                  fontSize: 10,
+                  background: "rgba(124,58,237,0.15)",
+                  padding: "1px 6px",
+                  borderRadius: 8,
+                  color: "#A78BFA",
+                }}
+              >
+                {profiles.length}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* User footer */}
@@ -415,6 +503,7 @@ function Board({
             selectedCount={selected.size}
             loading={loading}
             onSubmit={handleSubmit}
+            profiles={profiles}
           />
         </div>
 

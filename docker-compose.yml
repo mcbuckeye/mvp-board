@@ -38,11 +38,11 @@ services:
     labels:
       - "traefik.enable=true"
       # HTTP router (no TLS)
-      - "traefik.http.routers.mvpb-api.rule=Host(`mvp-board-api.machomelab.com`)"
+      - "traefik.http.routers.mvpb-api.rule=Host(`conveneagent-api.machomelab.com`)"
       - "traefik.http.routers.mvpb-api.entrypoints=web"
       - "traefik.http.routers.mvpb-api.service=mvpb-api"
       # HTTPS router
-      - "traefik.http.routers.mvpb-api-secure.rule=Host(`mvp-board-api.machomelab.com`)"
+      - "traefik.http.routers.mvpb-api-secure.rule=Host(`conveneagent-api.machomelab.com`)"
       - "traefik.http.routers.mvpb-api-secure.entrypoints=websecure"
       - "traefik.http.routers.mvpb-api-secure.tls.certResolver=letsencrypt"
       - "traefik.http.routers.mvpb-api-secure.service=mvpb-api"
@@ -61,11 +61,11 @@ services:
     labels:
       - "traefik.enable=true"
       # HTTP router (no TLS)
-      - "traefik.http.routers.mvpb-web.rule=Host(`mvp-board.machomelab.com`)"
+      - "traefik.http.routers.mvpb-web.rule=Host(`conveneagent.machomelab.com`)"
       - "traefik.http.routers.mvpb-web.entrypoints=web"
       - "traefik.http.routers.mvpb-web.service=mvpb-web"
       # HTTPS router
-      - "traefik.http.routers.mvpb-web-secure.rule=Host(`mvp-board.machomelab.com`)"
+      - "traefik.http.routers.mvpb-web-secure.rule=Host(`conveneagent.machomelab.com`)"
       - "traefik.http.routers.mvpb-web-secure.entrypoints=websecure"
       - "traefik.http.routers.mvpb-web-secure.tls.certResolver=letsencrypt"
       - "traefik.http.routers.mvpb-web-secure.service=mvpb-web"

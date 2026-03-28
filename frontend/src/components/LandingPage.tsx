@@ -21,7 +21,7 @@ const FEATURES = [
   { icon: "📋", title: "Consensus Reports", desc: "AI moderator synthesizes agreements, tensions, and recommended actions" },
   { icon: "✨", title: "Custom Advisors", desc: "Build your own advisor with custom voice, domain, and thinking frameworks" },
   { icon: "📚", title: "Session History", desc: "Revisit past board sessions and track how your thinking evolves" },
-  { icon: "🧑", title: "User Profiles", desc: "Multiple life domains for contextual advice", badge: "Coming Soon" },
+  { icon: "\u{1F9D1}", title: "User Profiles", desc: "Multiple life domains for contextual advice" },
   { icon: "📱", title: "Mobile Responsive", desc: "Full board experience on any device — phone, tablet, or desktop" },
   { icon: "🔒", title: "Private & Secure", desc: "Per-user data isolation, JWT authentication, no data sharing" },
 ];
@@ -246,7 +246,6 @@ export default function LandingPage({ onSignIn, onStartTrial }: { onSignIn: () =
                 <div className="landing-feature-icon">{f.icon}</div>
                 <h4>{f.title}</h4>
                 <p>{f.desc}</p>
-                {f.badge && <span className="landing-feature-badge">{f.badge}</span>}
               </div>
             ))}
           </div>

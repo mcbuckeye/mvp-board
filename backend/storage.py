@@ -6,7 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from models import CustomAdvisor, Session, SessionResponse
+from models import CustomAdvisor, Session, SessionResponse, UserProfile
 
 
 async def save_session(db: AsyncSession, session_data: dict[str, Any], user_id: str) -> Session:
@@ -133,6 +133,45 @@ async def list_sessions(db: AsyncSession, user_id: str) -> list[dict[str, Any]]:
         }
         for s in sessions
     ]
+
+
+async def list_profiles(db: AsyncSession, user_id: str) -> list[dict[str, Any]]:
+    result = await db.execute(
+        select(UserProfile)
+        .where(UserProfile.user_id == user_id)
+        .order_by(UserProfile.created_at)
+    )
+    return [
+        {
+            "id": p.id,
+            "profile_type": p.profile_type,
+            "title": p.title,
+            "content": p.content,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+        }
+        for p in result.scalars().all()
+    ]
+
+
+async def get_profile(db: AsyncSession, profile_id: str, user_id: str) -> UserProfile | None:
+    result = await db.execute(
+        select(UserProfile).where(
+            UserProfile.id == profile_id,
+            UserProfile.user_id == user_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_profiles_by_ids(db: AsyncSession, profile_ids: list[str], user_id: str) -> list[UserProfile]:
+    result = await db.execute(
+        select(UserProfile).where(
+            UserProfile.id.in_(profile_ids),
+            UserProfile.user_id == user_id,
+        )
+    )
+    return list(result.scalars().all())
 
 
 async def get_custom_advisors(db: AsyncSession, user_id: str) -> list[dict[str, Any]]:

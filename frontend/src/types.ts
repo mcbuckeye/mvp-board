@@ -32,3 +32,18 @@ export interface SessionSummary {
   advisors: string[];
   timestamp: string;
 }
+
+export interface UserProfile {
+  id: string;
+  profile_type: string;
+  title: string;
+  content: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ProfileTemplate {
+  profile_type: string;
+  title: string;
+  content: string;
+}

@@ -1,4 +1,4 @@
-# MVP Board — Roadmap
+# ConveneAgent — Roadmap
 
 ## ✅ v0.1 — MVP (Shipped 2026-03-28)
 - [x] 10 default advisors with system prompts
@@ -39,15 +39,19 @@
 
 ---
 
-## 📋 v0.4 — Context, Profiles & Memory
-**Goal:** Ground advisor responses in real data and personal context.
+## ✅ v0.4 — User Profiles + Rebrand (Shipped 2026-03-28)
+**Goal:** Ground advisor responses in personal context. Rebrand to ConveneAgent.
+
+### Rebrand
+- [x] **ConveneAgent** — renamed from MVP Board throughout app, Docker, and deploy config
+- [x] **New hostnames** — conveneagent.machomelab.com / conveneagent-api.machomelab.com
 
 ### User Profiles (Multi-Domain)
-- [ ] **Multiple user profiles** — each user can create several profiles for different life domains (Professional, Financial, Personal/Family, Technical, Entrepreneurial, Health, etc.)
-- [ ] **Profile editor** — rich text fields for background, goals, constraints, key facts
-- [ ] **Per-session profile selection** — when convening the board, toggle which profiles to attach as context. Asking about M&A? Attach Professional + Financial. Work-life balance? Professional + Personal.
-- [ ] **Profile privacy controls** — profiles are never shared between users; each profile clearly shows what will be sent to advisors
-- [ ] **Profile templates** — starter templates for common profile types to help users fill them out
+- [x] **Multiple user profiles** — each user can create several profiles for different life domains (Professional, Financial, Personal/Family, Technical, Entrepreneurial, Health, Custom)
+- [x] **Profile editor** — text editor for background, goals, constraints, key facts
+- [x] **Per-session profile selection** — when convening the board, toggle which profiles to attach as context. Asking about M&A? Attach Professional + Financial. Work-life balance? Professional + Personal.
+- [x] **Profile privacy controls** — profiles are never shared between users; each profile clearly shows what will be sent to advisors
+- [x] **Profile templates** — starter templates for common profile types to help users fill them out
 
 ### Document & Context
 - [ ] **Document upload** — paste or upload background docs (financials, deal memos, competitive analysis) that all advisors reference

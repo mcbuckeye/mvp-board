@@ -11,6 +11,7 @@ export default defineConfig({
       "/session": "http://localhost:8000",
       "/sessions": "http://localhost:8000",
       "/health": "http://localhost:8000",
+      "/profiles": "http://localhost:8000",
     },
   },
 });

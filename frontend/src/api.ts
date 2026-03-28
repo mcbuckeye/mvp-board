@@ -1,4 +1,4 @@
-import type { Advisor, Session, SessionSummary } from "./types";
+import type { Advisor, Session, SessionSummary, UserProfile, ProfileTemplate } from "./types";
 
 const BASE = "";
 
@@ -16,12 +16,13 @@ export async function fetchAdvisors(): Promise<Advisor[]> {
 
 export async function createSession(
   question: string,
-  advisors: string[]
+  advisors: string[],
+  profileIds?: string[]
 ): Promise<Session> {
   const res = await fetch(`${BASE}/session`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify({ question, advisors }),
+    body: JSON.stringify({ question, advisors, profile_ids: profileIds }),
   });
   return res.json();
 }
@@ -62,6 +63,50 @@ export async function deliberate(sessionId: string): Promise<Session> {
     throw new Error(err.detail || "Deliberation failed");
   }
   return res.json();
+}
+
+// ---------- profiles ----------
+
+export async function fetchProfiles(): Promise<UserProfile[]> {
+  const res = await fetch(`${BASE}/profiles`, { headers: authHeaders() });
+  return res.json();
+}
+
+export async function fetchProfileTemplates(): Promise<Record<string, ProfileTemplate>> {
+  const res = await fetch(`${BASE}/profiles/templates`, { headers: authHeaders() });
+  return res.json();
+}
+
+export async function createProfile(data: {
+  profile_type: string;
+  title: string;
+  content: string;
+}): Promise<UserProfile> {
+  const res = await fetch(`${BASE}/profiles`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function updateProfile(
+  id: string,
+  data: { profile_type?: string; title?: string; content?: string }
+): Promise<UserProfile> {
+  const res = await fetch(`${BASE}/profiles/${id}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function deleteProfile(id: string): Promise<void> {
+  await fetch(`${BASE}/profiles/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
 }
 
 export async function generateConsensus(sessionId: string): Promise<Session> {
