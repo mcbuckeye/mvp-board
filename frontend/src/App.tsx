@@ -69,13 +69,25 @@ function Board({
     });
   };
 
+  const [error, setError] = useState<string | null>(null);
+
   const handleSubmit = async (question: string) => {
     setLoading(true);
+    setError(null);
     try {
       const session = await api.createSession(question, [...selected]);
-      setCurrentSession(session);
-      const updated = await api.fetchSessions();
-      setHistory(updated);
+      if (session && session.responses) {
+        setCurrentSession(session);
+        const updated = await api.fetchSessions();
+        setHistory(updated);
+      } else {
+        setError("Unexpected response from the board. Please try again.");
+      }
+    } catch (e: any) {
+      console.error("Board session error:", e);
+      setError(e?.message === "Failed to fetch"
+        ? "Request timed out — try fewer advisors or a shorter question."
+        : `Error: ${e?.message || "Something went wrong. Please try again."}`);
     } finally {
       setLoading(false);
     }
@@ -135,9 +147,25 @@ function Board({
         </div>
       )}
 
+      {error && (
+        <div
+          style={{
+            padding: "14px 20px",
+            background: "#2a1515",
+            border: "1px solid #6b2c2c",
+            borderRadius: 8,
+            color: "#f87171",
+            fontSize: 14,
+            marginBottom: 16,
+          }}
+        >
+          {error}
+        </div>
+      )}
+
       {!loading && currentSession && <SessionView session={currentSession} />}
 
-      {!loading && !currentSession && (
+      {!loading && !currentSession && !error && (
         <div
           style={{
             display: "flex",
