@@ -9,6 +9,11 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
       - mvpb-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - dokploy-network
     labels:
@@ -30,7 +35,8 @@ services:
     expose:
       - "80"
     depends_on:
-      - mvpb-backend
+      mvpb-backend:
+        condition: service_healthy
     networks:
       - dokploy-network
     labels:

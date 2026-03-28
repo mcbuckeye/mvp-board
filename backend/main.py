@@ -36,6 +36,11 @@ class AdvisorCreate(BaseModel):
 
 # ---------- routes ----------
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.get("/advisors")
 def list_advisors():
     return advisors.get_all()
