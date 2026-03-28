@@ -1,18 +1,41 @@
 version: "3.9"
 
 services:
-  backend:
+  mvpb-backend:
     build: ./backend
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
-      - ./backend/data:/app/data
+      - mvpb-data:/app/data
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mvpb-api.rule=Host(`mvp-board-api.machomelab.com`)"
+      - "traefik.http.routers.mvpb-api.entrypoints=websecure"
+      - "traefik.http.routers.mvpb-api.tls.certResolver=letsencrypt"
+      - "traefik.http.services.mvpb-api.loadbalancer.server.port=8000"
 
-  frontend:
+  mvpb-frontend:
     build: ./frontend
-    ports:
-      - "5173:5173"
+    expose:
+      - "80"
     depends_on:
-      - backend
+      - mvpb-backend
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mvpb-web.rule=Host(`mvp-board.machomelab.com`)"
+      - "traefik.http.routers.mvpb-web.entrypoints=websecure"
+      - "traefik.http.routers.mvpb-web.tls.certResolver=letsencrypt"
+      - "traefik.http.services.mvpb-web.loadbalancer.server.port=80"
+
+volumes:
+  mvpb-data:
+
+networks:
+  dokploy-network:
+    external: true
