@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import type { AdvisorResponse, Session } from "../types";
 
 /**
@@ -250,15 +250,26 @@ export default function SessionView({
     flatList.push({ r, round: -1 }); // -1 = consensus
   }
 
+  const prevLengthRef = React.useRef(0);
+
   useEffect(() => {
-    setVisibleCount(0);
-    if (flatList.length === 0) return;
-    let i = 0;
+    const prevLength = prevLengthRef.current;
+    if (flatList.length === 0) {
+      setVisibleCount(0);
+      prevLengthRef.current = 0;
+      return;
+    }
+    // If this is a brand new session, animate from 0
+    // If responses were added (debate/consensus), show old ones instantly, animate only new ones
+    const startFrom = prevLength > 0 ? prevLength : 0;
+    setVisibleCount(startFrom);
+    let i = startFrom;
     const timer = setInterval(() => {
       i++;
       setVisibleCount(i);
       if (i >= flatList.length) clearInterval(timer);
     }, 150);
+    prevLengthRef.current = flatList.length;
     return () => clearInterval(timer);
   }, [session.id, session.responses.length]);
 
