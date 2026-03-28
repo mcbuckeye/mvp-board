@@ -51,3 +51,27 @@ export async function addAdvisor(advisor: {
   });
   return res.json();
 }
+
+export async function deliberate(sessionId: string): Promise<Session> {
+  const res = await fetch(`${BASE}/session/${sessionId}/deliberate`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Deliberation failed" }));
+    throw new Error(err.detail || "Deliberation failed");
+  }
+  return res.json();
+}
+
+export async function generateConsensus(sessionId: string): Promise<Session> {
+  const res = await fetch(`${BASE}/session/${sessionId}/consensus`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Consensus generation failed" }));
+    throw new Error(err.detail || "Consensus generation failed");
+  }
+  return res.json();
+}

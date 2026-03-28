@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -25,11 +25,59 @@ async def save_session(db: AsyncSession, session_data: dict[str, Any], user_id: 
             domain=r["domain"],
             color=r["color"],
             response=r["response"],
+            round=1,
         )
         db.add(resp)
 
     await db.commit()
     return session
+
+
+async def save_responses(
+    db: AsyncSession, session_id: str, responses: list[dict[str, Any]], round_num: int
+) -> None:
+    for r in responses:
+        resp = SessionResponse(
+            session_id=session_id,
+            advisor_id=r["advisor_id"],
+            name=r["name"],
+            domain=r["domain"],
+            color=r["color"],
+            response=r["response"],
+            round=round_num,
+        )
+        db.add(resp)
+    await db.commit()
+
+
+async def get_max_round(db: AsyncSession, session_id: str) -> int:
+    result = await db.execute(
+        select(func.max(SessionResponse.round)).where(SessionResponse.session_id == session_id)
+    )
+    val = result.scalar_one_or_none()
+    return val or 1
+
+
+async def get_responses_by_round(
+    db: AsyncSession, session_id: str, round_num: int
+) -> list[dict[str, Any]]:
+    result = await db.execute(
+        select(SessionResponse).where(
+            SessionResponse.session_id == session_id,
+            SessionResponse.round == round_num,
+        )
+    )
+    return [
+        {
+            "advisor_id": r.advisor_id,
+            "name": r.name,
+            "domain": r.domain,
+            "color": r.color,
+            "response": r.response,
+            "round": r.round,
+        }
+        for r in result.scalars().all()
+    ]
 
 
 async def load_session(db: AsyncSession, session_id: str, user_id: str) -> dict[str, Any] | None:
@@ -45,7 +93,9 @@ async def load_session(db: AsyncSession, session_id: str, user_id: str) -> dict[
     return {
         "id": session.id,
         "question": session.question,
-        "advisors": [r.advisor_id for r in session.responses],
+        "advisors": list(dict.fromkeys(
+            r.advisor_id for r in session.responses if r.advisor_id != "moderator"
+        )),
         "timestamp": session.timestamp.isoformat(),
         "responses": [
             {
@@ -54,9 +104,12 @@ async def load_session(db: AsyncSession, session_id: str, user_id: str) -> dict[
                 "domain": r.domain,
                 "color": r.color,
                 "response": r.response,
+                "round": r.round,
             }
-            for r in session.responses
+            for r in sorted(session.responses, key=lambda r: (r.round, r.name))
         ],
+        "max_round": max((r.round for r in session.responses), default=1),
+        "has_consensus": any(r.advisor_id == "moderator" for r in session.responses),
     }
 
 
@@ -73,7 +126,9 @@ async def list_sessions(db: AsyncSession, user_id: str) -> list[dict[str, Any]]:
         {
             "id": s.id,
             "question": s.question,
-            "advisors": [r.advisor_id for r in s.responses],
+            "advisors": list(dict.fromkeys(
+                r.advisor_id for r in s.responses if r.advisor_id != "moderator"
+            )),
             "timestamp": s.timestamp.isoformat(),
         }
         for s in sessions

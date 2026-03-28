@@ -29,13 +29,13 @@
 
 ---
 
-## 🔧 v0.3 — Board Deliberation (Next)
+## ✅ v0.3 — Board Deliberation (Shipped 2026-03-28)
 **Goal:** Advisors discuss and debate each other's positions.
 
-- [ ] **"Let Them Debate" button** — after individual responses, fire a second round where each advisor sees and responds to the others
-- [ ] **2-3 rounds of back-and-forth** — Jobs argues with Buffett about elegance vs. margin of safety
-- [ ] **Consensus Report** — auto-generated summary: points of agreement, key tensions, recommended actions, which advisor to weight most given the question type
-- [ ] **Moderator role** — optional AI moderator that synthesizes, probes, and calls out contradictions
+- [x] **"Let Them Debate" button** — after individual responses, fire a second round where each advisor sees and responds to the others
+- [x] **2-3 rounds of back-and-forth** — Jobs argues with Buffett about elegance vs. margin of safety
+- [x] **Consensus Report** — auto-generated summary: points of agreement, key tensions, recommended actions, strongest arguments, dissenting views, risk assessment
+- [x] **Moderator role** — AI moderator that synthesizes, probes, and calls out contradictions
 
 ---
 

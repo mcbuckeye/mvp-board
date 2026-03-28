@@ -176,7 +176,8 @@ async def create_session(
     custom = await storage.get_custom_advisors(db, user.id)
     session_data = await session_mod.create_session(body.question, body.advisors, custom)
     await storage.save_session(db, session_data, user.id)
-    return session_data
+    # Return full session from DB so shape matches (includes max_round, has_consensus)
+    return await storage.load_session(db, session_data["id"], user.id)
 
 
 @app.get("/sessions")
@@ -197,3 +198,75 @@ async def get_session(
     if s is None:
         raise HTTPException(404, "Session not found")
     return s
+
+
+@app.post("/session/{session_id}/deliberate")
+async def deliberate(
+    session_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    s = await storage.load_session(db, session_id, user.id)
+    if s is None:
+        raise HTTPException(404, "Session not found")
+
+    max_round = s["max_round"]
+    # Exclude moderator from round count
+    non_moderator_max = max(
+        (r["round"] for r in s["responses"] if r["advisor_id"] != "moderator"),
+        default=1,
+    )
+    if non_moderator_max >= 4:
+        raise HTTPException(400, "Maximum deliberation rounds (3) reached")
+
+    next_round = non_moderator_max + 1
+
+    # Get the latest round's non-moderator responses to feed into deliberation
+    latest_responses = [
+        r for r in s["responses"] if r["round"] == non_moderator_max and r["advisor_id"] != "moderator"
+    ]
+
+    custom = await storage.get_custom_advisors(db, user.id)
+    deliberation_responses = await session_mod.run_deliberation(
+        question=s["question"],
+        previous_responses=latest_responses,
+        round_num=next_round,
+        custom_advisors=custom,
+    )
+
+    await storage.save_responses(db, session_id, deliberation_responses, next_round)
+
+    # Return the full updated session
+    return await storage.load_session(db, session_id, user.id)
+
+
+@app.post("/session/{session_id}/consensus")
+async def consensus(
+    session_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    s = await storage.load_session(db, session_id, user.id)
+    if s is None:
+        raise HTTPException(404, "Session not found")
+
+    max_round = s["max_round"]
+    if max_round < 2:
+        raise HTTPException(400, "At least one deliberation round is required before generating consensus")
+
+    if s["has_consensus"]:
+        raise HTTPException(400, "Consensus report already generated for this session")
+
+    # Pass all responses with their round numbers
+    all_responses = [r for r in s["responses"] if r["advisor_id"] != "moderator"]
+    consensus_response = await session_mod.generate_consensus(
+        question=s["question"],
+        all_responses=all_responses,
+        max_round=max_round,
+    )
+
+    # Store consensus as a special round (max_round + 1)
+    consensus_round = max_round + 1
+    await storage.save_responses(db, session_id, [consensus_response], consensus_round)
+
+    return await storage.load_session(db, session_id, user.id)

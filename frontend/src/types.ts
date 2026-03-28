@@ -13,6 +13,7 @@ export interface AdvisorResponse {
   domain: string;
   color: string;
   response: string;
+  round: number;
 }
 
 export interface Session {
@@ -21,6 +22,8 @@ export interface Session {
   advisors: string[];
   timestamp: string;
   responses: AdvisorResponse[];
+  max_round: number;
+  has_consensus: boolean;
 }
 
 export interface SessionSummary {

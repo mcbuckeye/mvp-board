@@ -54,6 +54,8 @@ function Board({
   const [history, setHistory] = useState<SessionSummary[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState<"board" | "history" | null>(null);
+  const [deliberating, setDeliberating] = useState(false);
+  const [generatingConsensus, setGeneratingConsensus] = useState(false);
 
   useEffect(() => {
     api.fetchAdvisors().then(setAdvisors);
@@ -98,6 +100,34 @@ function Board({
     setCurrentSession(session);
     setShowHistory(false);
     setDrawerOpen(null);
+  };
+
+  const handleDeliberate = async () => {
+    if (!currentSession) return;
+    setDeliberating(true);
+    setError(null);
+    try {
+      const updated = await api.deliberate(currentSession.id);
+      setCurrentSession(updated);
+    } catch (e: any) {
+      setError(e?.message || "Deliberation failed");
+    } finally {
+      setDeliberating(false);
+    }
+  };
+
+  const handleConsensus = async () => {
+    if (!currentSession) return;
+    setGeneratingConsensus(true);
+    setError(null);
+    try {
+      const updated = await api.generateConsensus(currentSession.id);
+      setCurrentSession(updated);
+    } catch (e: any) {
+      setError(e?.message || "Consensus generation failed");
+    } finally {
+      setGeneratingConsensus(false);
+    }
   };
 
   const responseContent = (
@@ -163,7 +193,15 @@ function Board({
         </div>
       )}
 
-      {!loading && currentSession && <SessionView session={currentSession} />}
+      {!loading && currentSession && (
+        <SessionView
+          session={currentSession}
+          onDeliberate={handleDeliberate}
+          onConsensus={handleConsensus}
+          deliberating={deliberating}
+          generatingConsensus={generatingConsensus}
+        />
+      )}
 
       {!loading && !currentSession && !error && (
         <div

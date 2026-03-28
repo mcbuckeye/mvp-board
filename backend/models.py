@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -52,6 +52,7 @@ class SessionResponse(Base):
     domain: Mapped[str] = mapped_column(String(100), nullable=False)
     color: Mapped[str] = mapped_column(String(10), nullable=False)
     response: Mapped[str] = mapped_column(Text, nullable=False)
+    round: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     session: Mapped[Session] = relationship(back_populates="responses")
 
