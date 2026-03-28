@@ -36,8 +36,7 @@ async def _ask_advisor(advisor: advisors.Advisor, question: str) -> dict:
     }
 
 
-async def create_session(question: str, advisor_ids: list[str], custom_advisors: list[dict] | None = None) -> dict:
-    # Build lookup of custom advisors by id
+def _resolve_advisors(advisor_ids: list[str], custom_advisors: list[dict] | None = None) -> list[advisors.Advisor]:
     custom_map: dict[str, advisors.Advisor] = {}
     if custom_advisors:
         for ca in custom_advisors:
@@ -51,6 +50,11 @@ async def create_session(question: str, advisor_ids: list[str], custom_advisors:
             a = advisors.get(aid)
             if a is not None:
                 selected.append(a)
+    return selected
+
+
+async def create_session(question: str, advisor_ids: list[str], custom_advisors: list[dict] | None = None) -> dict:
+    selected = _resolve_advisors(advisor_ids, custom_advisors)
 
     tasks = [_ask_advisor(a, question) for a in selected]
     responses = await asyncio.gather(*tasks)
@@ -65,12 +69,29 @@ async def create_session(question: str, advisor_ids: list[str], custom_advisors:
     return session
 
 
+async def create_session_streaming(question: str, advisor_ids: list[str], custom_advisors: list[dict] | None = None) -> dict:
+    """Create a session that yields advisor responses one at a time as they complete."""
+    selected = _resolve_advisors(advisor_ids, custom_advisors)
+    session_id = uuid.uuid4().hex[:12]
+
+    async def stream():
+        tasks = {asyncio.ensure_future(_ask_advisor(a, question)): a for a in selected}
+        for coro in asyncio.as_completed(tasks.keys()):
+            result = await coro
+            yield result
+
+    return {
+        "id": session_id,
+        "question": question,
+        "advisors": advisor_ids,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "stream": stream(),
+    }
+
+
 def _resolve_advisor(advisor_id: str, custom_advisors: list[dict] | None = None) -> advisors.Advisor | None:
-    if custom_advisors:
-        for ca in custom_advisors:
-            if ca["id"] == advisor_id:
-                return advisors.Advisor(**ca)
-    return advisors.get(advisor_id)
+    resolved = _resolve_advisors([advisor_id], custom_advisors)
+    return resolved[0] if resolved else None
 
 
 async def _deliberate_advisor(

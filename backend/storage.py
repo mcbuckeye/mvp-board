@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from models import CustomAdvisor, Session, SessionResponse, UserProfile
+from models import BoardPreset, CustomAdvisor, Session, SessionResponse, UserProfile
 
 
 async def save_session(db: AsyncSession, session_data: dict[str, Any], user_id: str) -> Session:
@@ -110,6 +111,7 @@ async def load_session(db: AsyncSession, session_id: str, user_id: str) -> dict[
         ],
         "max_round": max((r.round for r in session.responses), default=1),
         "has_consensus": any(r.advisor_id == "moderator" for r in session.responses),
+        "starred_advisor_id": session.starred_advisor_id,
     }
 
 
@@ -214,3 +216,47 @@ async def save_custom_advisor(db: AsyncSession, user_id: str, data: dict[str, An
         "system_prompt": ca.system_prompt,
         "temperature": ca.temperature,
     }
+
+
+# ---------- presets ----------
+
+async def list_presets(db: AsyncSession, user_id: str) -> list[dict[str, Any]]:
+    result = await db.execute(
+        select(BoardPreset)
+        .where(BoardPreset.user_id == user_id)
+        .order_by(BoardPreset.created_at)
+    )
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "description": p.description,
+            "advisor_ids": json.loads(p.advisor_ids),
+            "color": p.color,
+            "is_system": False,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+        for p in result.scalars().all()
+    ]
+
+
+async def get_preset(db: AsyncSession, preset_id: str, user_id: str) -> BoardPreset | None:
+    result = await db.execute(
+        select(BoardPreset).where(
+            BoardPreset.id == preset_id,
+            BoardPreset.user_id == user_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def star_advisor(db: AsyncSession, session_id: str, user_id: str, advisor_id: str | None) -> bool:
+    result = await db.execute(
+        select(Session).where(Session.id == session_id, Session.user_id == user_id)
+    )
+    session = result.scalar_one_or_none()
+    if session is None:
+        return False
+    session.starred_advisor_id = advisor_id
+    await db.commit()
+    return True

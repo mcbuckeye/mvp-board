@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type MutableRefObject, useEffect, useState } from "react";
 import type { UserProfile } from "../types";
 
 const TYPE_ICONS: Record<string, string> = {
@@ -16,14 +16,27 @@ interface Props {
   loading: boolean;
   onSubmit: (question: string, profileIds: string[]) => void;
   profiles: UserProfile[];
+  submitRef?: MutableRefObject<(() => void) | null>;
 }
 
-export default function QuestionForm({ selectedCount, loading, onSubmit, profiles }: Props) {
+export default function QuestionForm({ selectedCount, loading, onSubmit, profiles, submitRef }: Props) {
   const [question, setQuestion] = useState("");
   const [selectedProfiles, setSelectedProfiles] = useState<Set<string>>(new Set());
   const [showProfiles, setShowProfiles] = useState(false);
 
   const canSubmit = question.trim().length > 0 && selectedCount >= 1 && !loading;
+
+  // Expose submit function via ref for keyboard shortcuts
+  useEffect(() => {
+    if (submitRef) {
+      submitRef.current = () => {
+        if (canSubmit) {
+          onSubmit(question.trim(), [...selectedProfiles]);
+          setQuestion("");
+        }
+      };
+    }
+  }, [submitRef, canSubmit, question, selectedProfiles, onSubmit]);
 
   const toggleProfile = (id: string) => {
     setSelectedProfiles((prev) => {
@@ -41,24 +54,38 @@ export default function QuestionForm({ selectedCount, loading, onSubmit, profile
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <textarea
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-        placeholder="What strategic question would you like the board to weigh in on?"
-        rows={4}
-        style={{
-          width: "100%",
-          boxSizing: "border-box",
-          padding: 14,
-          borderRadius: 8,
-          border: "1px solid #333",
-          background: "#141414",
-          color: "#eee",
-          fontSize: 15,
-          resize: "vertical",
-          fontFamily: "Inter, sans-serif",
-        }}
-      />
+      <div style={{ position: "relative" }}>
+        <textarea
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="What strategic question would you like the board to weigh in on?"
+          rows={4}
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            padding: 14,
+            borderRadius: 8,
+            border: "1px solid #333",
+            background: "#141414",
+            color: "#eee",
+            fontSize: 15,
+            resize: "vertical",
+            fontFamily: "Inter, sans-serif",
+          }}
+        />
+        <span
+          style={{
+            position: "absolute",
+            bottom: 8,
+            right: 12,
+            fontSize: 10,
+            color: "#444",
+            pointerEvents: "none",
+          }}
+        >
+          {navigator.platform.includes("Mac") ? "\u2318" : "Ctrl"}+Enter to submit
+        </span>
+      </div>
 
       {/* Profile context section */}
       {profiles.length > 0 && (

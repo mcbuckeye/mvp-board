@@ -5,6 +5,7 @@ interface Props {
   session: Session;
   onDeliberate?: () => void;
   onConsensus?: () => void;
+  onStar?: (advisorId: string) => void;
   deliberating?: boolean;
   generatingConsensus?: boolean;
 }
@@ -14,11 +15,15 @@ function ResponseCard({
   visible,
   isDeliberation,
   isModerator,
+  isStarred,
+  onStar,
 }: {
   r: AdvisorResponse;
   visible: boolean;
   isDeliberation: boolean;
   isModerator: boolean;
+  isStarred: boolean;
+  onStar?: () => void;
 }) {
   const bg = isModerator ? "#1a1708" : isDeliberation ? "#12121e" : "#141414";
   const borderColor = r.color;
@@ -33,6 +38,7 @@ function ResponseCard({
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0)" : "translateY(10px)",
         transition: "opacity 0.4s ease, transform 0.4s ease",
+        position: "relative",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
@@ -78,6 +84,46 @@ function ResponseCard({
             Consensus Report
           </span>
         )}
+        {isStarred && (
+          <span
+            style={{
+              fontSize: 10,
+              color: "#F59E0B",
+              background: "rgba(245,158,11,0.1)",
+              border: "1px solid rgba(245,158,11,0.3)",
+              padding: "2px 8px",
+              borderRadius: 10,
+              fontWeight: 600,
+            }}
+          >
+            Most Valuable
+          </span>
+        )}
+        {/* Star button — only for round 1, non-moderator */}
+        {!isModerator && onStar && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onStar();
+            }}
+            style={{
+              marginLeft: "auto",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 16,
+              padding: "2px 4px",
+              opacity: isStarred ? 1 : 0.4,
+              transition: "opacity 0.15s",
+              filter: isStarred ? "none" : "grayscale(1)",
+            }}
+            title={isStarred ? "Remove star" : "Star this response"}
+            onMouseOver={(e) => (e.currentTarget.style.opacity = "1")}
+            onMouseOut={(e) => (e.currentTarget.style.opacity = isStarred ? "1" : "0.4")}
+          >
+            {"\u{1F44D}"}
+          </button>
+        )}
       </div>
       <div
         style={{
@@ -98,7 +144,6 @@ function RoundSeparator({ round }: { round: number }) {
     round === 1
       ? "Initial Responses"
       : `Round ${round}: The Debate`;
-  const isConsensus = false; // handled separately via moderator card
   return (
     <div
       style={{
@@ -132,6 +177,7 @@ export default function SessionView({
   session,
   onDeliberate,
   onConsensus,
+  onStar,
   deliberating,
   generatingConsensus,
 }: Props) {
@@ -146,7 +192,6 @@ export default function SessionView({
     if (!rounds.has(rnd)) rounds.set(rnd, []);
     rounds.get(rnd)!.push(r);
   }
-  const sortedRounds = [...rounds.keys()].sort((a, b) => a - b);
 
   // Separate consensus (moderator) responses
   const hasConsensus = session.has_consensus;
@@ -200,6 +245,7 @@ export default function SessionView({
     for (const r of responses) {
       const idx = itemIndex;
       itemIndex++;
+      const isStarred = session.starred_advisor_id === r.advisor_id;
       sections.push(
         <ResponseCard
           key={`${r.advisor_id}-${rnd}-${idx}`}
@@ -207,6 +253,8 @@ export default function SessionView({
           visible={idx < visibleCount}
           isDeliberation={rnd > 1}
           isModerator={false}
+          isStarred={isStarred}
+          onStar={onStar ? () => onStar(r.advisor_id) : undefined}
         />
       );
     }
@@ -250,6 +298,7 @@ export default function SessionView({
           visible={idx < visibleCount}
           isDeliberation={false}
           isModerator={true}
+          isStarred={false}
         />
       );
     }

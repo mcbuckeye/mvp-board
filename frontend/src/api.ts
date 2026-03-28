@@ -1,4 +1,4 @@
-import type { Advisor, Session, SessionSummary, UserProfile, ProfileTemplate } from "./types";
+import type { Advisor, Session, SessionSummary, UserProfile, ProfileTemplate, BoardPreset, AdvisorResponse } from "./types";
 
 const BASE = "";
 
@@ -25,6 +25,60 @@ export async function createSession(
     body: JSON.stringify({ question, advisors, profile_ids: profileIds }),
   });
   return res.json();
+}
+
+export async function createSessionStreaming(
+  question: string,
+  advisors: string[],
+  profileIds: string[] | undefined,
+  onResponse: (response: AdvisorResponse) => void,
+  onComplete: (sessionId: string) => void,
+  onError: (error: string) => void
+): Promise<void> {
+  const res = await fetch(`${BASE}/session/stream`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ question, advisors, profile_ids: profileIds }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Streaming failed" }));
+    onError(err.detail || "Streaming failed");
+    return;
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) {
+    onError("Streaming not supported");
+    return;
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      try {
+        const data = JSON.parse(line.slice(6));
+        if (data.type === "response") {
+          const { type, ...response } = data;
+          onResponse(response as AdvisorResponse);
+        } else if (data.type === "complete") {
+          onComplete(data.session_id);
+        }
+      } catch {
+        // skip malformed lines
+      }
+    }
+  }
 }
 
 export async function fetchSessions(): Promise<SessionSummary[]> {
@@ -119,4 +173,54 @@ export async function generateConsensus(sessionId: string): Promise<Session> {
     throw new Error(err.detail || "Consensus generation failed");
   }
   return res.json();
+}
+
+// ---------- presets ----------
+
+export async function fetchPresets(): Promise<BoardPreset[]> {
+  const res = await fetch(`${BASE}/presets`, { headers: authHeaders() });
+  return res.json();
+}
+
+export async function createPreset(data: {
+  name: string;
+  description?: string;
+  advisor_ids: string[];
+  color?: string;
+}): Promise<BoardPreset> {
+  const res = await fetch(`${BASE}/presets`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function updatePreset(
+  id: string,
+  data: { name?: string; description?: string; advisor_ids?: string[]; color?: string }
+): Promise<BoardPreset> {
+  const res = await fetch(`${BASE}/presets/${id}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function deletePreset(id: string): Promise<void> {
+  await fetch(`${BASE}/presets/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+}
+
+// ---------- star ----------
+
+export async function starAdvisor(sessionId: string, advisorId: string | null): Promise<void> {
+  await fetch(`${BASE}/session/${sessionId}/star`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ advisor_id: advisorId }),
+  });
 }

@@ -6,6 +6,20 @@ interface Props {
   onSelect: (id: string) => void;
 }
 
+function formatDate(ts: string): string {
+  const d = new Date(ts);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return d.toLocaleDateString();
+}
+
 export default function SessionHistory({ sessions, activeId, onSelect }: Props) {
   if (sessions.length === 0) {
     return (
@@ -36,7 +50,7 @@ export default function SessionHistory({ sessions, activeId, onSelect }: Props) 
             display: "block",
             width: "100%",
             textAlign: "left",
-            padding: "8px 10px",
+            padding: "10px 10px",
             borderRadius: 6,
             border: "none",
             background: s.id === activeId ? "#2a2a3a" : "transparent",
@@ -44,14 +58,32 @@ export default function SessionHistory({ sessions, activeId, onSelect }: Props) 
             cursor: "pointer",
             fontSize: 13,
             lineHeight: 1.4,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
           }}
         >
-          {s.question.slice(0, 80)}
-          <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>
-            {new Date(s.timestamp).toLocaleDateString()} &middot; {s.advisors.length} advisors
+          <div
+            style={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {s.question.slice(0, 80)}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 4,
+              fontSize: 11,
+              color: "#666",
+            }}
+          >
+            <span style={{ fontWeight: 600, color: "#888" }}>
+              {s.advisors.length} advisor{s.advisors.length !== 1 ? "s" : ""}
+            </span>
+            <span>&middot;</span>
+            <span>{formatDate(s.timestamp)}</span>
           </div>
         </button>
       ))}

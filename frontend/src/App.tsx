@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
-import type { Advisor, Session, SessionSummary, UserProfile } from "./types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Advisor, AdvisorResponse, BoardPreset, Session, SessionSummary, UserProfile } from "./types";
 import * as api from "./api";
 import { useAuth } from "./AuthContext";
 import { useIsMobile } from "./hooks/useMediaQuery";
 import LandingPage from "./components/LandingPage";
 import LoginPage from "./components/LoginPage";
 import BoardRoster from "./components/BoardRoster";
+import PresetSection from "./components/PresetSection";
 import QuestionForm from "./components/QuestionForm";
 import SessionView from "./components/SessionView";
 import SessionHistory from "./components/SessionHistory";
@@ -68,64 +69,149 @@ function Board({
   const [loading, setLoading] = useState(false);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [history, setHistory] = useState<SessionSummary[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
+  const [sidebarView, setSidebarView] = useState<"roster" | "history">("roster");
   const [drawerOpen, setDrawerOpen] = useState<"board" | "history" | null>(null);
   const [deliberating, setDeliberating] = useState(false);
   const [generatingConsensus, setGeneratingConsensus] = useState(false);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [view, setView] = useState<"board" | "profiles">("board");
+  const [presets, setPresets] = useState<BoardPreset[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  // Streaming state
+  const [streamingResponses, setStreamingResponses] = useState<AdvisorResponse[]>([]);
+  const [streamingQuestion, setStreamingQuestion] = useState<string>("");
+  const [streamingTotal, setStreamingTotal] = useState(0);
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  // Ref for question form submission via keyboard
+  const submitRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     api.fetchAdvisors().then(setAdvisors);
     api.fetchSessions().then(setHistory);
     api.fetchProfiles().then(setProfiles);
+    api.fetchPresets().then(setPresets);
   }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't intercept if user is typing in an input/textarea (except Cmd+Enter)
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
+
+      // Cmd/Ctrl+Enter to submit
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        submitRef.current?.();
+        return;
+      }
+
+      // Number keys to toggle advisors (only when not in an input)
+      if (isInput) return;
+      const keyMap: Record<string, number> = {
+        "1": 0, "2": 1, "3": 2, "4": 3, "5": 4,
+        "6": 5, "7": 6, "8": 7, "9": 8, "0": 9, "-": 10,
+      };
+      if (e.key in keyMap && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const idx = keyMap[e.key];
+        if (idx < advisors.length) {
+          e.preventDefault();
+          toggle(advisors[idx].id);
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [advisors]);
 
   const refreshProfiles = () => {
     api.fetchProfiles().then(setProfiles);
   };
 
-  const toggle = (id: string) => {
+  const refreshPresets = () => {
+    api.fetchPresets().then(setPresets);
+  };
+
+  const toggle = useCallback((id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  }, []);
+
+  const handleApplyPreset = (advisorIds: string[]) => {
+    setSelected(new Set(advisorIds));
   };
 
-  const [error, setError] = useState<string | null>(null);
+  const handleSavePreset = async (name: string, description: string) => {
+    await api.createPreset({
+      name,
+      description: description || undefined,
+      advisor_ids: [...selected],
+    });
+    refreshPresets();
+  };
+
+  const handleDeletePreset = async (id: string) => {
+    await api.deletePreset(id);
+    refreshPresets();
+  };
 
   const handleSubmit = async (question: string, profileIds: string[]) => {
     setLoading(true);
     setError(null);
+    setStreamingResponses([]);
+    setStreamingQuestion(question);
+    setStreamingTotal(selected.size);
+    setIsStreaming(true);
+    setCurrentSession(null);
+
     try {
-      const session = await api.createSession(
+      await api.createSessionStreaming(
         question,
         [...selected],
-        profileIds.length > 0 ? profileIds : undefined
+        profileIds.length > 0 ? profileIds : undefined,
+        // onResponse — each advisor arrives
+        (response) => {
+          setStreamingResponses((prev) => [...prev, { ...response, round: 1 }]);
+        },
+        // onComplete — all done
+        async (sessionId) => {
+          setIsStreaming(false);
+          setLoading(false);
+          // Fetch the full session from DB
+          const session = await api.fetchSession(sessionId);
+          setCurrentSession(session);
+          setStreamingResponses([]);
+          const updated = await api.fetchSessions();
+          setHistory(updated);
+        },
+        // onError
+        (errMsg) => {
+          setIsStreaming(false);
+          setLoading(false);
+          setError(errMsg);
+        }
       );
-      if (session && session.responses) {
-        setCurrentSession(session);
-        const updated = await api.fetchSessions();
-        setHistory(updated);
-      } else {
-        setError("Unexpected response from the board. Please try again.");
-      }
     } catch (e: any) {
-      console.error("Board session error:", e);
-      setError(e?.message === "Failed to fetch"
-        ? "Request timed out — try fewer advisors or a shorter question."
-        : `Error: ${e?.message || "Something went wrong. Please try again."}`);
-    } finally {
+      setIsStreaming(false);
       setLoading(false);
+      setError(
+        e?.message === "Failed to fetch"
+          ? "Request timed out — try fewer advisors or a shorter question."
+          : `Error: ${e?.message || "Something went wrong. Please try again."}`
+      );
     }
   };
 
   const handleSelectSession = async (id: string) => {
     const session = await api.fetchSession(id);
     setCurrentSession(session);
-    setShowHistory(false);
+    setSidebarView("roster");
     setDrawerOpen(null);
   };
 
@@ -157,6 +243,13 @@ function Board({
     }
   };
 
+  const handleStar = async (advisorId: string) => {
+    if (!currentSession) return;
+    const newStarred = currentSession.starred_advisor_id === advisorId ? null : advisorId;
+    await api.starAdvisor(currentSession.id, newStarred);
+    setCurrentSession({ ...currentSession, starred_advisor_id: newStarred });
+  };
+
   // Profiles view
   if (view === "profiles") {
     return (
@@ -179,9 +272,110 @@ function Board({
     );
   }
 
+  // Streaming loading state — show responses as they arrive
+  const streamingContent = isStreaming && (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div
+        style={{
+          padding: "12px 16px",
+          background: "#1E1E2E",
+          borderRadius: 8,
+          borderLeft: "4px solid #7C3AED",
+        }}
+      >
+        <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>Question</div>
+        <div style={{ fontSize: 15, color: "#eee" }}>{streamingQuestion}</div>
+      </div>
+
+      {/* Progress indicator */}
+      <div
+        style={{
+          fontSize: 13,
+          color: "#A78BFA",
+          textAlign: "center",
+          padding: "4px 0",
+        }}
+      >
+        {streamingResponses.length} of {streamingTotal} advisors have responded...
+      </div>
+
+      {/* Arrived responses */}
+      {streamingResponses.map((r, i) => (
+        <div
+          key={`stream-${r.advisor_id}-${i}`}
+          style={{
+            padding: "16px 20px",
+            background: "#141414",
+            borderRadius: 10,
+            borderLeft: `4px solid ${r.color}`,
+            animation: "fadeSlideIn 0.4s ease",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: r.color,
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ fontWeight: 600, color: r.color, fontSize: 14 }}>{r.name}</span>
+            <span style={{ fontSize: 12, color: "#666" }}>{r.domain}</span>
+          </div>
+          <div style={{ fontSize: 14, lineHeight: 1.7, color: "#ccc", whiteSpace: "pre-wrap" }}>
+            {r.response}
+          </div>
+        </div>
+      ))}
+
+      {/* Remaining advisors still deliberating */}
+      {[...selected]
+        .filter((id) => !streamingResponses.some((r) => r.advisor_id === id))
+        .map((id) => {
+          const a = advisors.find((x) => x.id === id);
+          return (
+            <div
+              key={`waiting-${id}`}
+              style={{
+                padding: "16px 20px",
+                background: "#141414",
+                borderRadius: 10,
+                borderLeft: `4px solid ${a?.color ?? "#555"}`,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: a?.color ?? "#555",
+                    animation: "pulse 1.5s infinite",
+                  }}
+                />
+                <span style={{ color: a?.color ?? "#888", fontWeight: 600, fontSize: 14 }}>
+                  {a?.name ?? id}
+                </span>
+                <span style={{ color: "#555", fontSize: 13, fontStyle: "italic" }}>
+                  is deliberating...
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      <style>{`
+        @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
+        @keyframes fadeSlideIn { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }
+      `}</style>
+    </div>
+  );
+
   const responseContent = (
     <>
-      {loading && (
+      {/* Non-streaming loading (fallback) */}
+      {loading && !isStreaming && (
         <div
           style={{
             display: "flex",
@@ -226,6 +420,8 @@ function Board({
         </div>
       )}
 
+      {streamingContent}
+
       {error && (
         <div
           style={{
@@ -242,17 +438,18 @@ function Board({
         </div>
       )}
 
-      {!loading && currentSession && (
+      {!loading && !isStreaming && currentSession && (
         <SessionView
           session={currentSession}
           onDeliberate={handleDeliberate}
           onConsensus={handleConsensus}
+          onStar={handleStar}
           deliberating={deliberating}
           generatingConsensus={generatingConsensus}
         />
       )}
 
-      {!loading && !currentSession && !error && (
+      {!loading && !isStreaming && !currentSession && !error && (
         <div
           style={{
             display: "flex",
@@ -318,6 +515,7 @@ function Board({
             loading={loading}
             onSubmit={handleSubmit}
             profiles={profiles}
+            submitRef={submitRef}
           />
         </div>
 
@@ -332,6 +530,14 @@ function Board({
           title="Board Members"
           onClose={() => setDrawerOpen(null)}
         >
+          <PresetSection
+            presets={presets}
+            advisors={advisors}
+            selected={selected}
+            onApplyPreset={handleApplyPreset}
+            onSavePreset={handleSavePreset}
+            onDeletePreset={handleDeletePreset}
+          />
           <BoardRoster advisors={advisors} selected={selected} onToggle={toggle} />
         </BottomDrawer>
 
@@ -386,7 +592,7 @@ function Board({
             ConveneAgent
           </h1>
           <button
-            onClick={() => setShowHistory(!showHistory)}
+            onClick={() => setSidebarView(sidebarView === "history" ? "roster" : "history")}
             style={{
               background: "none",
               border: "1px solid #333",
@@ -397,19 +603,31 @@ function Board({
               padding: "3px 8px",
             }}
           >
-            {showHistory ? "Roster" : "History"}
+            {sidebarView === "history" ? "Roster" : "History"}
           </button>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto" }}>
-          {showHistory ? (
+          {sidebarView === "history" ? (
             <SessionHistory
               sessions={history}
               activeId={currentSession?.id ?? null}
               onSelect={handleSelectSession}
             />
           ) : (
-            <BoardRoster advisors={advisors} selected={selected} onToggle={toggle} />
+            <>
+              <BoardRoster advisors={advisors} selected={selected} onToggle={toggle} />
+              <div style={{ borderTop: "1px solid #222" }}>
+                <PresetSection
+                  presets={presets}
+                  advisors={advisors}
+                  selected={selected}
+                  onApplyPreset={handleApplyPreset}
+                  onSavePreset={handleSavePreset}
+                  onDeletePreset={handleDeletePreset}
+                />
+              </div>
+            </>
           )}
         </div>
 
@@ -504,6 +722,7 @@ function Board({
             loading={loading}
             onSubmit={handleSubmit}
             profiles={profiles}
+            submitRef={submitRef}
           />
         </div>
 

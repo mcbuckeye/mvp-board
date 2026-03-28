@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +20,7 @@ from auth import (
     verify_password,
 )
 from database import get_db, init_db
-from models import User, UserProfile
+from models import BoardPreset, User, UserProfile
 
 
 @asynccontextmanager
@@ -65,6 +67,24 @@ class ProfileUpdate(BaseModel):
     profile_type: str | None = None
     title: str | None = None
     content: str | None = None
+
+
+class PresetCreate(BaseModel):
+    name: str
+    description: str | None = None
+    advisor_ids: list[str]
+    color: str = "#7C3AED"
+
+
+class PresetUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    advisor_ids: list[str] | None = None
+    color: str | None = None
+
+
+class StarRequest(BaseModel):
+    advisor_id: str | None = None
 
 
 class RegisterRequest(BaseModel):
@@ -412,3 +432,199 @@ async def consensus(
     await storage.save_responses(db, session_id, [consensus_response], consensus_round)
 
     return await storage.load_session(db, session_id, user.id)
+
+
+# ---------- streaming session (SSE) ----------
+
+@app.post("/session/stream")
+async def create_session_stream(
+    body: SessionCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not body.advisors:
+        raise HTTPException(400, "Select at least one advisor")
+
+    question = body.question
+    if body.profile_ids:
+        profiles = await storage.get_profiles_by_ids(db, body.profile_ids, user.id)
+        if profiles:
+            context_parts = ["[USER CONTEXT]"]
+            for p in profiles:
+                context_parts.append(f"{p.title}: {p.content}")
+            context_parts.append("[END USER CONTEXT]")
+            context_parts.append("")
+            context_parts.append(f"Question: {body.question}")
+            question = "\n".join(context_parts)
+
+    custom = await storage.get_custom_advisors(db, user.id)
+
+    async def event_stream():
+        session_data = await session_mod.create_session_streaming(question, body.advisors, custom)
+        session_id = session_data["id"]
+
+        # Save session shell first (no responses yet)
+        await storage.save_session(db, {
+            "id": session_id,
+            "question": question,
+            "responses": [],
+        }, user.id)
+
+        async for response in session_data["stream"]:
+            # Save each response as it arrives
+            await storage.save_responses(db, session_id, [response], 1)
+            yield f"data: {json.dumps({'type': 'response', **response})}\n\n"
+
+        yield f"data: {json.dumps({'type': 'complete', 'session_id': session_id})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+# ---------- star advisor ----------
+
+@app.post("/session/{session_id}/star")
+async def star_session_advisor(
+    session_id: str,
+    body: StarRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ok = await storage.star_advisor(db, session_id, user.id, body.advisor_id)
+    if not ok:
+        raise HTTPException(404, "Session not found")
+    return {"ok": True, "starred_advisor_id": body.advisor_id}
+
+
+# ---------- presets ----------
+
+SYSTEM_PRESETS = [
+    {
+        "id": "preset-strategy",
+        "name": "Strategy Board",
+        "description": "Innovation + OKRs + People + Positioning",
+        "advisor_ids": ["jobs", "grove", "nooyi", "suntzu"],
+        "color": "#7C3AED",
+        "is_system": True,
+    },
+    {
+        "id": "preset-investment",
+        "name": "Investment Board",
+        "description": "Value + Traction + Operations",
+        "advisor_ids": ["buffett", "cuban", "whitman"],
+        "color": "#22C55E",
+        "is_system": True,
+    },
+    {
+        "id": "preset-ethics",
+        "name": "Ethics & Wisdom",
+        "description": "Values + Clarity + Truth",
+        "advisor_ids": ["mandela", "buddha", "oprah"],
+        "color": "#F59E0B",
+        "is_system": True,
+    },
+    {
+        "id": "preset-full",
+        "name": "Full Board",
+        "description": "All 11 advisors convened",
+        "advisor_ids": ["jobs", "cuban", "nooyi", "mandela", "musk", "grove", "suntzu", "whitman", "oprah", "buffett", "buddha"],
+        "color": "#6366F1",
+        "is_system": True,
+    },
+    {
+        "id": "preset-disruption",
+        "name": "Disruption Panel",
+        "description": "Scale + Innovation + Traction",
+        "advisor_ids": ["musk", "jobs", "cuban"],
+        "color": "#3B82F6",
+        "is_system": True,
+    },
+]
+
+
+@app.get("/presets")
+async def list_presets(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user_presets = await storage.list_presets(db, user.id)
+    return SYSTEM_PRESETS + user_presets
+
+
+@app.post("/presets")
+async def create_preset(
+    body: PresetCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    preset = BoardPreset(
+        user_id=user.id,
+        name=body.name,
+        description=body.description,
+        advisor_ids=json.dumps(body.advisor_ids),
+        color=body.color,
+    )
+    db.add(preset)
+    await db.commit()
+    await db.refresh(preset)
+    return {
+        "id": preset.id,
+        "name": preset.name,
+        "description": preset.description,
+        "advisor_ids": json.loads(preset.advisor_ids),
+        "color": preset.color,
+        "is_system": False,
+        "created_at": preset.created_at.isoformat() if preset.created_at else None,
+    }
+
+
+@app.put("/presets/{preset_id}")
+async def update_preset(
+    preset_id: str,
+    body: PresetUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    preset = await storage.get_preset(db, preset_id, user.id)
+    if preset is None:
+        raise HTTPException(404, "Preset not found")
+    if body.name is not None:
+        preset.name = body.name
+    if body.description is not None:
+        preset.description = body.description
+    if body.advisor_ids is not None:
+        preset.advisor_ids = json.dumps(body.advisor_ids)
+    if body.color is not None:
+        preset.color = body.color
+    await db.commit()
+    await db.refresh(preset)
+    return {
+        "id": preset.id,
+        "name": preset.name,
+        "description": preset.description,
+        "advisor_ids": json.loads(preset.advisor_ids),
+        "color": preset.color,
+        "is_system": False,
+        "created_at": preset.created_at.isoformat() if preset.created_at else None,
+    }
+
+
+@app.delete("/presets/{preset_id}")
+async def delete_preset(
+    preset_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    preset = await storage.get_preset(db, preset_id, user.id)
+    if preset is None:
+        raise HTTPException(404, "Preset not found")
+    await db.delete(preset)
+    await db.commit()
+    return {"ok": True}

@@ -60,20 +60,22 @@
 
 ---
 
-## 🎯 v0.5 — Boards & Presets
+## ✅ v0.5 — Boards & Presets (Shipped 2026-03-28)
 **Goal:** Different boards for different question types.
 
-- [ ] **Custom board presets** — save compositions: "M&A Board" (Cuban, Buffett, Whitman, Grove), "Product Board" (Jobs, Musk, Nooyi)
-- [ ] **One-click board load** — select a preset instead of picking advisors manually
+- [x] **Custom board presets** — save compositions: "M&A Board" (Cuban, Buffett, Whitman, Grove), "Product Board" (Jobs, Musk, Nooyi)
+- [x] **One-click board load** — select a preset instead of picking advisors manually
+- [x] **5 system default presets** — Strategy Board, Investment Board, Ethics & Wisdom, Full Board, Disruption Panel
 - [ ] **Question type routing** — suggest which board preset fits the question
 
 ---
 
-## ⚡ v0.6 — UX Polish
-- [ ] **Streaming responses** — stream each advisor's response as it arrives (SSE)
-- [ ] **Vote/Weight system** — flag which advisor's take resonated most; app learns preferences over time
+## ✅ v0.6 — Streaming + UX Polish (Shipped 2026-03-28)
+- [x] **Streaming responses** — stream each advisor's response as it arrives (SSE)
+- [x] **Vote/Weight system** — star the most valuable advisor per session
+- [x] **Keyboard shortcuts** — Cmd+Enter to submit, number keys 1-9,0,- to toggle advisors
+- [x] **Enhanced session history** — relative timestamps, prominent advisor counts
 - [ ] **Export** — PDF/email a board session as a formatted advisory memo
-- [ ] **Keyboard shortcuts** — Cmd+Enter to submit, number keys to toggle advisors
 
 ---
 

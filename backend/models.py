@@ -29,6 +29,7 @@ class User(Base):
     sessions: Mapped[list[Session]] = relationship(back_populates="user", cascade="all, delete-orphan")
     custom_advisors: Mapped[list[CustomAdvisor]] = relationship(back_populates="user", cascade="all, delete-orphan")
     profiles: Mapped[list[UserProfile]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    presets: Mapped[list[BoardPreset]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Session(Base):
@@ -38,6 +39,7 @@ class Session(Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     question: Mapped[str] = mapped_column(Text, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    starred_advisor_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="sessions")
     responses: Mapped[list[SessionResponse]] = relationship(back_populates="session", cascade="all, delete-orphan")
@@ -86,3 +88,17 @@ class CustomAdvisor(Base):
     temperature: Mapped[float] = mapped_column(Float, nullable=False, default=0.7)
 
     user: Mapped[User] = relationship(back_populates="custom_advisors")
+
+
+class BoardPreset(Base):
+    __tablename__ = "board_presets"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: uuid.uuid4().hex)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    advisor_ids: Mapped[str] = mapped_column(Text, nullable=False)  # JSON array
+    color: Mapped[str] = mapped_column(String(10), nullable=False, default="#7C3AED")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    user: Mapped[User] = relationship(back_populates="presets")
