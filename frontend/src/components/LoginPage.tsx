@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useAuth } from "../AuthContext";
 
-export default function LoginPage() {
+export default function LoginPage({ defaultRegister = false, onBack }: { defaultRegister?: boolean; onBack?: () => void }) {
   const { login, register } = useAuth();
-  const [isRegister, setIsRegister] = useState(false);
+  const [isRegister, setIsRegister] = useState(defaultRegister);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -47,6 +47,25 @@ export default function LoginPage() {
           border: "1px solid #222",
         }}
       >
+        {onBack && (
+          <button
+            onClick={onBack}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#666",
+              cursor: "pointer",
+              fontSize: 13,
+              fontFamily: "Inter, sans-serif",
+              padding: "0 0 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            ← Back
+          </button>
+        )}
         <h1
           style={{
             margin: "0 0 8px",
@@ -56,7 +75,7 @@ export default function LoginPage() {
             textAlign: "center",
           }}
         >
-          MVP Board
+          ConveneAgent
         </h1>
         <p
           style={{

@@ -3,6 +3,7 @@ import type { Advisor, Session, SessionSummary } from "./types";
 import * as api from "./api";
 import { useAuth } from "./AuthContext";
 import { useIsMobile } from "./hooks/useMediaQuery";
+import LandingPage from "./components/LandingPage";
 import LoginPage from "./components/LoginPage";
 import BoardRoster from "./components/BoardRoster";
 import QuestionForm from "./components/QuestionForm";
@@ -13,6 +14,7 @@ import "./App.css";
 
 export default function App() {
   const { user, loading: authLoading, logout } = useAuth();
+  const [authView, setAuthView] = useState<"landing" | "login" | "register">("landing");
 
   if (authLoading) {
     return (
@@ -33,7 +35,20 @@ export default function App() {
   }
 
   if (!user) {
-    return <LoginPage />;
+    if (authView === "login" || authView === "register") {
+      return (
+        <LoginPage
+          defaultRegister={authView === "register"}
+          onBack={() => setAuthView("landing")}
+        />
+      );
+    }
+    return (
+      <LandingPage
+        onSignIn={() => setAuthView("login")}
+        onStartTrial={() => setAuthView("register")}
+      />
+    );
   }
 
   return <Board user={user} onLogout={logout} />;
