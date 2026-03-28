@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import advisors
@@ -20,12 +20,17 @@ from auth import (
     verify_password,
 )
 from database import get_db, init_db
-from models import BoardPreset, User, UserProfile
+from embedding import chunk_and_embed_document
+from models import AdvisorChunk, AdvisorDocument, BoardPreset, User, UserProfile
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    # Seed default advisor corpora asynchronously (don't block startup)
+    import asyncio
+    from seed_corpus import seed_default_corpora
+    asyncio.create_task(seed_default_corpora())
     yield
 
 
@@ -81,6 +86,13 @@ class PresetUpdate(BaseModel):
     description: str | None = None
     advisor_ids: list[str] | None = None
     color: str | None = None
+
+
+class DocumentCreate(BaseModel):
+    title: str
+    content: str
+    source_url: str | None = None
+    source_type: str = "quote_collection"
 
 
 class StarRequest(BaseModel):
@@ -336,7 +348,7 @@ async def create_session(
 
     # Fetch user's custom advisors so session can use them
     custom = await storage.get_custom_advisors(db, user.id)
-    session_data = await session_mod.create_session(question, body.advisors, custom)
+    session_data = await session_mod.create_session(question, body.advisors, custom, db=db)
     await storage.save_session(db, session_data, user.id)
     # Return full session from DB so shape matches (includes max_round, has_consensus)
     return await storage.load_session(db, session_data["id"], user.id)
@@ -394,6 +406,7 @@ async def deliberate(
         previous_responses=latest_responses,
         round_num=next_round,
         custom_advisors=custom,
+        db=db,
     )
 
     await storage.save_responses(db, session_id, deliberation_responses, next_round)
@@ -460,7 +473,7 @@ async def create_session_stream(
     custom = await storage.get_custom_advisors(db, user.id)
 
     async def event_stream():
-        session_data = await session_mod.create_session_streaming(question, body.advisors, custom)
+        session_data = await session_mod.create_session_streaming(question, body.advisors, custom, db=db)
         session_id = session_data["id"]
 
         # Save session shell first (no responses yet)
@@ -501,6 +514,131 @@ async def star_session_advisor(
     if not ok:
         raise HTTPException(404, "Session not found")
     return {"ok": True, "starred_advisor_id": body.advisor_id}
+
+
+# ---------- advisor documents (knowledge base) ----------
+
+@app.get("/advisors/{advisor_id}/documents")
+async def list_advisor_documents(
+    advisor_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(AdvisorDocument)
+        .where(AdvisorDocument.advisor_id == advisor_id)
+        .order_by(AdvisorDocument.created_at)
+    )
+    docs = result.scalars().all()
+    out = []
+    for d in docs:
+        chunk_count = await db.execute(
+            select(func.count(AdvisorChunk.id)).where(AdvisorChunk.document_id == d.id)
+        )
+        out.append({
+            "id": d.id,
+            "advisor_id": d.advisor_id,
+            "title": d.title,
+            "source_url": d.source_url,
+            "source_type": d.source_type,
+            "chunk_count": chunk_count.scalar() or 0,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+        })
+    return out
+
+
+@app.post("/advisors/{advisor_id}/documents")
+async def upload_advisor_document(
+    advisor_id: str,
+    body: DocumentCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    import uuid
+    doc = AdvisorDocument(
+        id=uuid.uuid4().hex,
+        advisor_id=advisor_id,
+        title=body.title,
+        source_url=body.source_url,
+        source_type=body.source_type,
+        content=body.content,
+    )
+    db.add(doc)
+    await db.commit()
+    await db.refresh(doc)
+
+    # Chunk and embed in background-ish (still awaited but after commit)
+    chunks = await chunk_and_embed_document(db, doc)
+
+    return {
+        "id": doc.id,
+        "advisor_id": doc.advisor_id,
+        "title": doc.title,
+        "source_url": doc.source_url,
+        "source_type": doc.source_type,
+        "chunk_count": len(chunks),
+        "created_at": doc.created_at.isoformat() if doc.created_at else None,
+    }
+
+
+@app.delete("/advisors/{advisor_id}/documents/{doc_id}")
+async def delete_advisor_document(
+    advisor_id: str,
+    doc_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(AdvisorDocument).where(
+            AdvisorDocument.id == doc_id,
+            AdvisorDocument.advisor_id == advisor_id,
+        )
+    )
+    doc = result.scalar_one_or_none()
+    if doc is None:
+        raise HTTPException(404, "Document not found")
+    await db.delete(doc)
+    await db.commit()
+    return {"ok": True}
+
+
+@app.get("/advisors/{advisor_id}/documents/{doc_id}/chunks")
+async def list_document_chunks(
+    advisor_id: str,
+    doc_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(AdvisorChunk)
+        .where(AdvisorChunk.document_id == doc_id, AdvisorChunk.advisor_id == advisor_id)
+        .order_by(AdvisorChunk.chunk_index)
+    )
+    return [
+        {
+            "id": c.id,
+            "chunk_index": c.chunk_index,
+            "chunk_text": c.chunk_text,
+            "has_embedding": c.embedding is not None,
+        }
+        for c in result.scalars().all()
+    ]
+
+
+@app.get("/knowledge-base/summary")
+async def knowledge_base_summary(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns document count per advisor for the knowledge base overview."""
+    from sqlalchemy import func as sa_func
+    result = await db.execute(
+        select(
+            AdvisorDocument.advisor_id,
+            sa_func.count(AdvisorDocument.id).label("doc_count"),
+        ).group_by(AdvisorDocument.advisor_id)
+    )
+    return {row[0]: row[1] for row in result.fetchall()}
 
 
 # ---------- presets ----------

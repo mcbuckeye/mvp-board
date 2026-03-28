@@ -215,6 +215,51 @@ export async function deletePreset(id: string): Promise<void> {
   });
 }
 
+// ---------- knowledge base ----------
+
+export interface AdvisorDocumentSummary {
+  id: string;
+  advisor_id: string;
+  title: string;
+  source_url: string | null;
+  source_type: string;
+  chunk_count: number;
+  created_at: string | null;
+}
+
+export async function fetchKnowledgeBaseSummary(): Promise<Record<string, number>> {
+  const res = await fetch(`${BASE}/knowledge-base/summary`, { headers: authHeaders() });
+  return res.json();
+}
+
+export async function fetchAdvisorDocuments(advisorId: string): Promise<AdvisorDocumentSummary[]> {
+  const res = await fetch(`${BASE}/advisors/${advisorId}/documents`, { headers: authHeaders() });
+  return res.json();
+}
+
+export async function uploadAdvisorDocument(
+  advisorId: string,
+  data: { title: string; content: string; source_url?: string; source_type: string }
+): Promise<AdvisorDocumentSummary> {
+  const res = await fetch(`${BASE}/advisors/${advisorId}/documents`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Upload failed" }));
+    throw new Error(err.detail || "Upload failed");
+  }
+  return res.json();
+}
+
+export async function deleteAdvisorDocument(advisorId: string, docId: string): Promise<void> {
+  await fetch(`${BASE}/advisors/${advisorId}/documents/${docId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+}
+
 // ---------- star ----------
 
 export async function starAdvisor(sessionId: string, advisorId: string | null): Promise<void> {

@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -88,6 +89,34 @@ class CustomAdvisor(Base):
     temperature: Mapped[float] = mapped_column(Float, nullable=False, default=0.7)
 
     user: Mapped[User] = relationship(back_populates="custom_advisors")
+
+
+class AdvisorDocument(Base):
+    __tablename__ = "advisor_documents"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: uuid.uuid4().hex)
+    advisor_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    source_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    chunks: Mapped[list["AdvisorChunk"]] = relationship(back_populates="document", cascade="all, delete-orphan")
+
+
+class AdvisorChunk(Base):
+    __tablename__ = "advisor_chunks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: uuid.uuid4().hex)
+    document_id: Mapped[str] = mapped_column(String(36), ForeignKey("advisor_documents.id"), nullable=False, index=True)
+    advisor_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    embedding = mapped_column(Vector(1536), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    document: Mapped[AdvisorDocument] = relationship(back_populates="chunks")
 
 
 class BoardPreset(Base):

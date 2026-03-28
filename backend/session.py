@@ -6,19 +6,38 @@ import uuid
 from datetime import datetime, timezone
 
 from openai import AsyncOpenAI
+from sqlalchemy.ext.asyncio import AsyncSession as DBSession
 
 import advisors
+from retrieval import retrieve_context, format_rag_context
 
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
 
 
-async def _ask_advisor(advisor: advisors.Advisor, question: str) -> dict:
+async def _get_rag_context(db: DBSession | None, advisor_id: str, question: str) -> str:
+    """Retrieve RAG context for an advisor, returns empty string if no DB or no docs."""
+    if db is None:
+        return ""
+    try:
+        chunks = await retrieve_context(db, advisor_id, question, top_k=5)
+        return format_rag_context(chunks)
+    except Exception:
+        return ""
+
+
+async def _ask_advisor(advisor: advisors.Advisor, question: str, db: DBSession | None = None) -> dict:
+    rag_context = await _get_rag_context(db, advisor.id, question)
+
+    user_content = question
+    if rag_context:
+        user_content = f"{rag_context}\n\n{question}"
+
     try:
         resp = await client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": advisor.system_prompt},
-                {"role": "user", "content": question},
+                {"role": "user", "content": user_content},
             ],
             temperature=advisor.temperature,
             max_tokens=1024,
@@ -53,10 +72,10 @@ def _resolve_advisors(advisor_ids: list[str], custom_advisors: list[dict] | None
     return selected
 
 
-async def create_session(question: str, advisor_ids: list[str], custom_advisors: list[dict] | None = None) -> dict:
+async def create_session(question: str, advisor_ids: list[str], custom_advisors: list[dict] | None = None, db: DBSession | None = None) -> dict:
     selected = _resolve_advisors(advisor_ids, custom_advisors)
 
-    tasks = [_ask_advisor(a, question) for a in selected]
+    tasks = [_ask_advisor(a, question, db) for a in selected]
     responses = await asyncio.gather(*tasks)
 
     session = {
@@ -69,13 +88,13 @@ async def create_session(question: str, advisor_ids: list[str], custom_advisors:
     return session
 
 
-async def create_session_streaming(question: str, advisor_ids: list[str], custom_advisors: list[dict] | None = None) -> dict:
+async def create_session_streaming(question: str, advisor_ids: list[str], custom_advisors: list[dict] | None = None, db: DBSession | None = None) -> dict:
     """Create a session that yields advisor responses one at a time as they complete."""
     selected = _resolve_advisors(advisor_ids, custom_advisors)
     session_id = uuid.uuid4().hex[:12]
 
     async def stream():
-        tasks = {asyncio.ensure_future(_ask_advisor(a, question)): a for a in selected}
+        tasks = {asyncio.ensure_future(_ask_advisor(a, question, db)): a for a in selected}
         for coro in asyncio.as_completed(tasks.keys()):
             result = await coro
             yield result
@@ -99,14 +118,20 @@ async def _deliberate_advisor(
     question: str,
     other_responses: list[dict],
     round_num: int,
+    db: DBSession | None = None,
 ) -> dict:
+    rag_context = await _get_rag_context(db, advisor.id, question)
+
     others_text = "\n\n".join(
         f"[{r['name']}] ({r['domain']}): {r['response']}"
         for r in other_responses
     )
 
     round_label = f"Round {round_num}" if round_num > 2 else "initial round"
-    deliberation_prompt = (
+    deliberation_prompt = ""
+    if rag_context:
+        deliberation_prompt += f"{rag_context}\n\n"
+    deliberation_prompt += (
         f"ORIGINAL QUESTION:\n{question}\n\n"
         f"OTHER BOARD MEMBERS' RESPONSES FROM THE {round_label}:\n\n{others_text}\n\n"
         "You have heard the other board members' perspectives. Now respond: "
@@ -144,6 +169,7 @@ async def run_deliberation(
     previous_responses: list[dict],
     round_num: int,
     custom_advisors: list[dict] | None = None,
+    db: DBSession | None = None,
 ) -> list[dict]:
     """Each advisor responds to all OTHER advisors' latest-round responses."""
     # Get unique advisor IDs from the previous round's responses
@@ -156,7 +182,7 @@ async def run_deliberation(
             continue
         # All responses except this advisor's own
         others = [r for r in previous_responses if r["advisor_id"] != aid]
-        tasks.append(_deliberate_advisor(advisor, question, others, round_num))
+        tasks.append(_deliberate_advisor(advisor, question, others, round_num, db))
 
     responses = await asyncio.gather(*tasks)
     return list(responses)

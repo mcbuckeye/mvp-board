@@ -1,6 +1,40 @@
 import { useEffect, useState } from "react";
 import type { AdvisorResponse, Session } from "../types";
 
+/**
+ * Render text with [Citation] patterns styled as inline badges.
+ * Matches patterns like [Source Title], [Berkshire 2023 Letter], etc.
+ */
+function renderWithCitations(text: string): (string | JSX.Element)[] {
+  // Match [Text] but exclude markdown-style links [text](url) and common markdown like [x]
+  const parts = text.split(/(\[[^\]]{4,}\])(?!\()/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("[") && part.endsWith("]") && part.length > 5) {
+      const citation = part.slice(1, -1);
+      return (
+        <span
+          key={i}
+          style={{
+            display: "inline",
+            background: "rgba(124, 58, 237, 0.15)",
+            color: "#C4B5FD",
+            fontSize: 12,
+            padding: "1px 7px",
+            borderRadius: 4,
+            fontWeight: 500,
+            letterSpacing: 0.2,
+            whiteSpace: "nowrap",
+          }}
+          title={citation}
+        >
+          {citation}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
 interface Props {
   session: Session;
   onDeliberate?: () => void;
@@ -133,7 +167,7 @@ function ResponseCard({
           whiteSpace: "pre-wrap",
         }}
       >
-        {r.response}
+        {renderWithCitations(r.response)}
       </div>
     </div>
   );

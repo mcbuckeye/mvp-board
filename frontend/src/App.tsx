@@ -12,6 +12,7 @@ import SessionView from "./components/SessionView";
 import SessionHistory from "./components/SessionHistory";
 import BottomDrawer from "./components/BottomDrawer";
 import ProfilesPage from "./components/ProfilesPage";
+import KnowledgeBase from "./components/KnowledgeBase";
 import "./App.css";
 
 export default function App() {
@@ -70,11 +71,11 @@ function Board({
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [history, setHistory] = useState<SessionSummary[]>([]);
   const [sidebarView, setSidebarView] = useState<"roster" | "history">("roster");
-  const [drawerOpen, setDrawerOpen] = useState<"board" | "history" | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState<"board" | "history" | "menu" | null>(null);
   const [deliberating, setDeliberating] = useState(false);
   const [generatingConsensus, setGeneratingConsensus] = useState(false);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
-  const [view, setView] = useState<"board" | "profiles">("board");
+  const [view, setView] = useState<"board" | "profiles" | "knowledge">("board");
   const [presets, setPresets] = useState<BoardPreset[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -267,6 +268,26 @@ function Board({
             refreshProfiles();
             setView("board");
           }}
+        />
+      </div>
+    );
+  }
+
+  // Knowledge Base view
+  if (view === "knowledge") {
+    return (
+      <div
+        style={{
+          height: "100vh",
+          background: "#0d0d0d",
+          color: "#eee",
+          fontFamily: "'Inter', sans-serif",
+          overflowY: "auto",
+        }}
+      >
+        <KnowledgeBase
+          advisors={advisors}
+          onBack={() => setView("board")}
         />
       </div>
     );
@@ -501,6 +522,9 @@ function Board({
         {/* Mobile menu dropdown */}
         {drawerOpen === "menu" && (
           <div className="mobile-menu-dropdown">
+            <button className="mobile-menu-item" onClick={() => { setView("knowledge"); setDrawerOpen(null); }}>
+              📚 Knowledge Base
+            </button>
             <button className="mobile-menu-item" onClick={() => { setView("profiles"); setDrawerOpen(null); }}>
               📋 My Profiles
             </button>
@@ -638,13 +662,40 @@ function Board({
           )}
         </div>
 
-        {/* Profiles button */}
+        {/* Knowledge Base + Profiles buttons */}
         <div
           style={{
             padding: "8px 14px",
             borderTop: "1px solid #222",
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
           }}
         >
+          <button
+            onClick={() => setView("knowledge")}
+            style={{
+              width: "100%",
+              padding: "8px 12px",
+              borderRadius: 6,
+              border: "1px solid #333",
+              background: "transparent",
+              color: "#A78BFA",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: "Inter, sans-serif",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              justifyContent: "center",
+              transition: "border-color 0.2s",
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.borderColor = "#7C3AED")}
+            onMouseOut={(e) => (e.currentTarget.style.borderColor = "#333")}
+          >
+            <span style={{ fontSize: 14 }}>{"\u{1F4DA}"}</span> Knowledge Base
+          </button>
           <button
             onClick={() => setView("profiles")}
             style={{

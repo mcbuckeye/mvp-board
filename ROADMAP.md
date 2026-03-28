@@ -79,14 +79,15 @@
 
 ---
 
-## 🔬 v0.7 — Deep Persona Research & RAG
+## ✅ v0.7 — Deep Persona Research & RAG (Shipped 2026-03-28)
 **Goal:** Make advisors truly authentic by grounding them in real source material.
 
 ### Per-Advisor RAG
-- [ ] **Per-advisor vector store** — each advisor gets their own index (pgvector) containing their writings, speeches, interviews, known positions
-- [ ] **Contextual retrieval** — on each question, retrieve top 5-10 relevant chunks from advisor's corpus and inject as grounding
-- [ ] **Citation support** — responses include `[Source: Berkshire 2023 Annual Letter]` when grounded in real material
-- [ ] **Living corpus** — add new interviews/writings as published; living advisors stay current
+- [x] **Per-advisor vector store** — each advisor gets their own index (pgvector) containing their writings, speeches, interviews, known positions
+- [x] **Contextual retrieval** — on each question, retrieve top 5 relevant chunks from advisor's corpus and inject as grounding
+- [x] **Citation support** — responses include `[Source Title]` when grounded in real material, styled as inline badges
+- [x] **Living corpus** — Knowledge Base UI for adding new documents; auto-chunks and embeds
+- [x] **Seeded corpora** — 11 default advisors seeded with 50+ curated quotes/principles each on startup
 
 ### Research Sources
 - [ ] **Published works** — books, letters, memos, annual reports (Buffett's shareholder letters, Grove's "High Output Management", etc.)
