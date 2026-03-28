@@ -68,3 +68,5 @@ class CustomAdvisor(Base):
     color: Mapped[str] = mapped_column(String(10), nullable=False, default="#8B5CF6")
     system_prompt: Mapped[str] = mapped_column(Text, nullable=False)
     temperature: Mapped[float] = mapped_column(Float, nullable=False, default=0.7)
+
+    user: Mapped[User] = relationship(back_populates="custom_advisors")
