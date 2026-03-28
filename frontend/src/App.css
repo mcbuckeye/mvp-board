@@ -1,3 +1,8 @@
+/* Global reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 /* Mobile overrides — < 768px */
 @media (max-width: 767px) {
   .mobile-header {

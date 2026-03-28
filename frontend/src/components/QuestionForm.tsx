@@ -20,6 +20,7 @@ export default function QuestionForm({ selectedCount, loading, onSubmit }: Props
         rows={4}
         style={{
           width: "100%",
+          boxSizing: "border-box",
           padding: 14,
           borderRadius: 8,
           border: "1px solid #333",
