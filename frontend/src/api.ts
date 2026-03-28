@@ -2,8 +2,15 @@ import type { Advisor, Session, SessionSummary } from "./types";
 
 const BASE = "";
 
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("token");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
+}
+
 export async function fetchAdvisors(): Promise<Advisor[]> {
-  const res = await fetch(`${BASE}/advisors`);
+  const res = await fetch(`${BASE}/advisors`, { headers: authHeaders() });
   return res.json();
 }
 
@@ -13,19 +20,19 @@ export async function createSession(
 ): Promise<Session> {
   const res = await fetch(`${BASE}/session`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(),
     body: JSON.stringify({ question, advisors }),
   });
   return res.json();
 }
 
 export async function fetchSessions(): Promise<SessionSummary[]> {
-  const res = await fetch(`${BASE}/sessions`);
+  const res = await fetch(`${BASE}/sessions`, { headers: authHeaders() });
   return res.json();
 }
 
 export async function fetchSession(id: string): Promise<Session> {
-  const res = await fetch(`${BASE}/session/${id}`);
+  const res = await fetch(`${BASE}/session/${id}`, { headers: authHeaders() });
   return res.json();
 }
 
@@ -39,7 +46,7 @@ export async function addAdvisor(advisor: {
 }): Promise<Advisor> {
   const res = await fetch(`${BASE}/advisors`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(),
     body: JSON.stringify(advisor),
   });
   return res.json();

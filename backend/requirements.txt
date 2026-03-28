@@ -2,3 +2,8 @@ fastapi
 uvicorn
 openai
 pydantic
+sqlalchemy[asyncio]
+asyncpg
+alembic
+passlib[bcrypt]
+python-jose[cryptography]

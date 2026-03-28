@@ -1,12 +1,48 @@
 import { useEffect, useState } from "react";
 import type { Advisor, Session, SessionSummary } from "./types";
 import * as api from "./api";
+import { useAuth } from "./AuthContext";
+import LoginPage from "./components/LoginPage";
 import BoardRoster from "./components/BoardRoster";
 import QuestionForm from "./components/QuestionForm";
 import SessionView from "./components/SessionView";
 import SessionHistory from "./components/SessionHistory";
 
 export default function App() {
+  const { user, loading: authLoading, logout } = useAuth();
+
+  if (authLoading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100vh",
+          background: "#0d0d0d",
+          color: "#666",
+          fontFamily: "'Inter', sans-serif",
+        }}
+      >
+        Loading...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  return <Board user={user} onLogout={logout} />;
+}
+
+function Board({
+  user,
+  onLogout,
+}: {
+  user: { id: string; email: string; display_name: string };
+  onLogout: () => void;
+}) {
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -106,6 +142,35 @@ export default function App() {
           ) : (
             <BoardRoster advisors={advisors} selected={selected} onToggle={toggle} />
           )}
+        </div>
+
+        {/* User footer */}
+        <div
+          style={{
+            padding: "10px 14px",
+            borderTop: "1px solid #222",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <span style={{ fontSize: 12, color: "#888", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {user.display_name}
+          </span>
+          <button
+            onClick={onLogout}
+            style={{
+              background: "none",
+              border: "1px solid #333",
+              borderRadius: 4,
+              color: "#888",
+              cursor: "pointer",
+              fontSize: 11,
+              padding: "3px 8px",
+            }}
+          >
+            Logout
+          </button>
         </div>
       </div>
 
