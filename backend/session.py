@@ -15,13 +15,46 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
 
 
 async def _get_rag_context(db: DBSession | None, advisor_id: str, question: str) -> str:
-    """Retrieve RAG context for an advisor using a fresh DB session to avoid transaction conflicts."""
+    """Retrieve RAG context for an advisor using a dedicated DB connection.
+    
+    Uses a completely separate engine connection to avoid greenlet/transaction
+    conflicts when called from asyncio.gather().
+    """
     if db is None:
         return ""
     try:
-        from database import async_session
-        async with async_session() as rag_db:
-            chunks = await retrieve_context(rag_db, advisor_id, question, top_k=5)
+        from database import engine
+        async with engine.connect() as conn:
+            from sqlalchemy import text as sql_text, select
+            from models import AdvisorChunk
+            # Quick check if advisor has any chunks
+            check = await conn.execute(
+                sql_text("SELECT 1 FROM advisor_chunks WHERE advisor_id = :aid LIMIT 1"),
+                {"aid": advisor_id},
+            )
+            if check.fetchone() is None:
+                return ""
+            
+            from embedding import embed_single
+            question_embedding = await embed_single(question)
+            embedding_str = "[" + ",".join(str(x) for x in question_embedding) + "]"
+            
+            result = await conn.execute(
+                sql_text("""
+                    SELECT c.chunk_text, d.title, 1 - (c.embedding <=> :embedding::vector) AS similarity
+                    FROM advisor_chunks c
+                    JOIN advisor_documents d ON c.document_id = d.id
+                    WHERE c.advisor_id = :advisor_id AND c.embedding IS NOT NULL
+                    ORDER BY c.embedding <=> :embedding::vector
+                    LIMIT 5
+                """),
+                {"advisor_id": advisor_id, "embedding": embedding_str},
+            )
+            rows = result.fetchall()
+            if not rows:
+                return ""
+            
+            chunks = [{"chunk_text": r[0], "document_title": r[1], "similarity": float(r[2])} for r in rows]
             return format_rag_context(chunks)
     except Exception:
         return ""
