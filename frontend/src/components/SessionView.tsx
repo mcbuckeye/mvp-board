@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import type { AdvisorResponse, Session } from "../types";
 
 /**
@@ -215,8 +215,6 @@ export default function SessionView({
   deliberating,
   generatingConsensus,
 }: Props) {
-  const [visibleCount, setVisibleCount] = useState(0);
-
   const allResponses = session.responses;
 
   // Group by round
@@ -250,10 +248,7 @@ export default function SessionView({
     flatList.push({ r, round: -1 }); // -1 = consensus
   }
 
-  useEffect(() => {
-    // Show all responses immediately — streaming handles its own progressive reveal
-    setVisibleCount(flatList.length);
-  }, [session.id, session.responses.length]);
+  // All responses are always visible — streaming handles its own progressive reveal
 
   const maxNonModeratorRound = Math.max(
     ...allResponses.filter((r) => r.advisor_id !== "moderator").map((r) => r.round ?? 1),
@@ -277,7 +272,7 @@ export default function SessionView({
         <ResponseCard
           key={`${r.advisor_id}-${rnd}-${idx}`}
           r={r}
-          visible={idx < visibleCount}
+          visible={true}
           isDeliberation={rnd > 1}
           isModerator={false}
           isStarred={isStarred}
@@ -322,7 +317,7 @@ export default function SessionView({
         <ResponseCard
           key={`moderator-${idx}`}
           r={r}
-          visible={idx < visibleCount}
+          visible={true}
           isDeliberation={false}
           isModerator={true}
           isStarred={false}
