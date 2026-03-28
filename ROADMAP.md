@@ -39,9 +39,17 @@
 
 ---
 
-## 📋 v0.4 — Context & Memory
-**Goal:** Ground advisor responses in real data, not just vibes.
+## 📋 v0.4 — Context, Profiles & Memory
+**Goal:** Ground advisor responses in real data and personal context.
 
+### User Profiles (Multi-Domain)
+- [ ] **Multiple user profiles** — each user can create several profiles for different life domains (Professional, Financial, Personal/Family, Technical, Entrepreneurial, Health, etc.)
+- [ ] **Profile editor** — rich text fields for background, goals, constraints, key facts
+- [ ] **Per-session profile selection** — when convening the board, toggle which profiles to attach as context. Asking about M&A? Attach Professional + Financial. Work-life balance? Professional + Personal.
+- [ ] **Profile privacy controls** — profiles are never shared between users; each profile clearly shows what will be sent to advisors
+- [ ] **Profile templates** — starter templates for common profile types to help users fill them out
+
+### Document & Context
 - [ ] **Document upload** — paste or upload background docs (financials, deal memos, competitive analysis) that all advisors reference
 - [ ] **Advisor memory** — persist context across sessions so advisors remember prior questions
 - [ ] **Session threading** — link follow-up sessions to originals for continuous advisory conversations
