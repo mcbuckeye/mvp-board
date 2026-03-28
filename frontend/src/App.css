@@ -1,0 +1,68 @@
+/* Mobile overrides — < 768px */
+@media (max-width: 767px) {
+  .mobile-header {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #111;
+    border-bottom: 1px solid #222;
+    flex-shrink: 0;
+    gap: 8px;
+  }
+
+  .mobile-header-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #A78BFA;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .mobile-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .mobile-header-btn {
+    background: none;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 5px 10px;
+    font-family: 'Inter', sans-serif;
+    white-space: nowrap;
+  }
+
+  .mobile-header-btn:active {
+    background: #222;
+  }
+
+  .mobile-user-name {
+    font-size: 11px;
+    color: #666;
+    max-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-main-padding {
+    padding: 14px 14px 10px !important;
+  }
+
+  .mobile-responses-padding {
+    padding: 0 14px 14px !important;
+  }
+}
+
+/* Desktop — hide mobile header */
+@media (min-width: 768px) {
+  .mobile-header {
+    display: none !important;
+  }
+}
