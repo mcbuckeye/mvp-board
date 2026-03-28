@@ -15,12 +15,14 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
 
 
 async def _get_rag_context(db: DBSession | None, advisor_id: str, question: str) -> str:
-    """Retrieve RAG context for an advisor, returns empty string if no DB or no docs."""
+    """Retrieve RAG context for an advisor using a fresh DB session to avoid transaction conflicts."""
     if db is None:
         return ""
     try:
-        chunks = await retrieve_context(db, advisor_id, question, top_k=5)
-        return format_rag_context(chunks)
+        from database import async_session
+        async with async_session() as rag_db:
+            chunks = await retrieve_context(rag_db, advisor_id, question, top_k=5)
+            return format_rag_context(chunks)
     except Exception:
         return ""
 
