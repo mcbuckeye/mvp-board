@@ -489,24 +489,31 @@ function Board({
               Board{selected.size > 0 ? ` (${selected.size})` : ""}
             </button>
             <button
-              className="mobile-header-btn"
-              onClick={() => setView("profiles")}
-              title="Profiles"
+              className="mobile-header-btn mobile-hamburger"
+              onClick={() => setDrawerOpen(drawerOpen === "menu" ? null : "menu")}
+              aria-label="Menu"
             >
-              Profiles
-            </button>
-            <button
-              className="mobile-header-btn"
-              onClick={() => setDrawerOpen(drawerOpen === "history" ? null : "history")}
-            >
-              History
-            </button>
-            <span className="mobile-user-name">{user.display_name}</span>
-            <button className="mobile-header-btn" onClick={onLogout}>
-              Logout
+              ☰
             </button>
           </div>
         </div>
+
+        {/* Mobile menu dropdown */}
+        {drawerOpen === "menu" && (
+          <div className="mobile-menu-dropdown">
+            <button className="mobile-menu-item" onClick={() => { setView("profiles"); setDrawerOpen(null); }}>
+              📋 My Profiles
+            </button>
+            <button className="mobile-menu-item" onClick={() => { setDrawerOpen("history"); }}>
+              📜 History
+            </button>
+            <div className="mobile-menu-divider" />
+            <div className="mobile-menu-user">{user.display_name}</div>
+            <button className="mobile-menu-item mobile-menu-logout" onClick={onLogout}>
+              Logout
+            </button>
+          </div>
+        )}
 
         {/* Question form */}
         <div style={{ padding: "14px 14px 10px" }}>
