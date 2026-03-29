@@ -348,7 +348,7 @@ async def create_session(
 
     # Fetch user's custom advisors so session can use them
     custom = await storage.get_custom_advisors(db, user.id)
-    session_data = await session_mod.create_session(question, body.advisors, custom, db=db)
+    session_data = await session_mod.create_session(question, body.advisors, custom, db=None)
     await storage.save_session(db, session_data, user.id)
     # Return full session from DB so shape matches (includes max_round, has_consensus)
     return await storage.load_session(db, session_data["id"], user.id)
@@ -406,7 +406,7 @@ async def deliberate(
         previous_responses=latest_responses,
         round_num=next_round,
         custom_advisors=custom,
-        db=db,
+        db=None,  # Don't pass db to parallel calls — causes greenlet conflicts
     )
 
     await storage.save_responses(db, session_id, deliberation_responses, next_round)
@@ -473,7 +473,7 @@ async def create_session_stream(
     custom = await storage.get_custom_advisors(db, user.id)
 
     async def event_stream():
-        session_data = await session_mod.create_session_streaming(question, body.advisors, custom, db=db)
+        session_data = await session_mod.create_session_streaming(question, body.advisors, custom, db=None)
         session_id = session_data["id"]
 
         # Save session shell first (no responses yet)
