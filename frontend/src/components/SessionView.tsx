@@ -6,30 +6,81 @@ import type { AdvisorResponse, Session } from "../types";
  * No external dependencies.
  */
 function markdownToHtml(text: string): string {
-  let html = text
-    // Escape HTML entities
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    // Headers (## and ###)
-    .replace(/^### (.+)$/gm, '<h4 style="margin:16px 0 8px;font-size:14px;font-weight:700;color:#ddd">$1</h4>')
-    .replace(/^## (.+)$/gm, '<h3 style="margin:20px 0 10px;font-size:16px;font-weight:700;color:#eee">$1</h3>')
-    // Bold
-    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#eee">$1</strong>')
-    // Italic
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Numbered lists
-    .replace(/^(\d+)\.\s+(.+)$/gm, '<li style="margin:4px 0;margin-left:20px;list-style-type:decimal">$2</li>')
-    // Bullet lists
-    .replace(/^[-•]\s+(.+)$/gm, '<li style="margin:4px 0;margin-left:20px;list-style-type:disc">$1</li>')
-    // Citations [Source Title]
-    .replace(/\[([^\]]{4,})\](?!\()/g, '<span style="display:inline;background:rgba(124,58,237,0.15);color:#C4B5FD;font-size:12px;padding:1px 7px;border-radius:4px;font-weight:500;white-space:nowrap">$1</span>')
-    // Paragraphs (double newlines)
-    .replace(/\n\n/g, '</p><p style="margin:8px 0">')
-    // Single newlines (within paragraphs, keep as breaks)
-    .replace(/\n/g, '<br/>');
+  // Process line by line to properly wrap lists
+  const lines = text.split("\n");
+  const result: string[] = [];
+  let inOl = false;
+  let inUl = false;
 
-  return '<p style="margin:8px 0">' + html + '</p>';
+  for (const rawLine of lines) {
+    let line = rawLine
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    // Headers
+    const h3Match = line.match(/^## (.+)$/);
+    const h4Match = line.match(/^### (.+)$/);
+    if (h4Match) {
+      if (inOl) { result.push("</ol>"); inOl = false; }
+      if (inUl) { result.push("</ul>"); inUl = false; }
+      line = h4Match[1].replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
+      result.push('<h4 style="margin:16px 0 8px;font-size:14px;font-weight:700;color:#ddd">' + line + "</h4>");
+      continue;
+    }
+    if (h3Match) {
+      if (inOl) { result.push("</ol>"); inOl = false; }
+      if (inUl) { result.push("</ul>"); inUl = false; }
+      line = h3Match[1].replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
+      result.push('<h3 style="margin:20px 0 10px;font-size:16px;font-weight:700;color:#eee">' + line + "</h3>");
+      continue;
+    }
+
+    // Numbered list
+    const olMatch = rawLine.match(/^\d+\.\s+(.+)$/);
+    if (olMatch) {
+      if (inUl) { result.push("</ul>"); inUl = false; }
+      if (!inOl) { result.push('<ol style="margin:8px 0;padding-left:24px">'); inOl = true; }
+      let content = olMatch[1].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      content = content.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
+      content = content.replace(/\[([^\]]{4,})\](?!\()/g, '<span style="display:inline;background:rgba(124,58,237,0.15);color:#C4B5FD;font-size:12px;padding:1px 7px;border-radius:4px;font-weight:500;white-space:nowrap">$1</span>');
+      result.push('<li style="margin:6px 0">' + content + "</li>");
+      continue;
+    }
+
+    // Bullet list
+    const ulMatch = rawLine.match(/^[-•]\s+(.+)$/);
+    if (ulMatch) {
+      if (inOl) { result.push("</ol>"); inOl = false; }
+      if (!inUl) { result.push('<ul style="margin:8px 0;padding-left:24px">'); inUl = true; }
+      let content = ulMatch[1].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      content = content.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
+      content = content.replace(/\[([^\]]{4,})\](?!\()/g, '<span style="display:inline;background:rgba(124,58,237,0.15);color:#C4B5FD;font-size:12px;padding:1px 7px;border-radius:4px;font-weight:500;white-space:nowrap">$1</span>');
+      result.push('<li style="margin:6px 0">' + content + "</li>");
+      continue;
+    }
+
+    // Close any open lists on non-list lines
+    if (inOl) { result.push("</ol>"); inOl = false; }
+    if (inUl) { result.push("</ul>"); inUl = false; }
+
+    // Empty line = paragraph break
+    if (line.trim() === "") {
+      result.push('<div style="height:12px"></div>');
+      continue;
+    }
+
+    // Regular text with inline formatting
+    line = line.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#eee">$1</strong>');
+    line = line.replace(/\*(.+?)\*/g, "<em>$1</em>");
+    line = line.replace(/\[([^\]]{4,})\](?!\()/g, '<span style="display:inline;background:rgba(124,58,237,0.15);color:#C4B5FD;font-size:12px;padding:1px 7px;border-radius:4px;font-weight:500;white-space:nowrap">$1</span>');
+    result.push('<p style="margin:4px 0">' + line + "</p>");
+  }
+
+  if (inOl) result.push("</ol>");
+  if (inUl) result.push("</ul>");
+
+  return result.join("\n");
 }
 
 /**
