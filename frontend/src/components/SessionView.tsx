@@ -12,7 +12,8 @@ function markdownToHtml(text: string): string {
   let inOl = false;
   let inUl = false;
 
-  for (const rawLine of lines) {
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const rawLine = lines[lineIdx];
     let line = rawLine
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
@@ -60,15 +61,27 @@ function markdownToHtml(text: string): string {
       continue;
     }
 
+    // Empty line — keep lists open if next line continues the list
+    if (line.trim() === "") {
+      const remaining = lines.slice(lineIdx + 1);
+      const nextNonEmpty = remaining.find(l => l.trim() !== "");
+      const listContinues = nextNonEmpty && (
+        (inOl && /^\d+\.\s+/.test(nextNonEmpty)) ||
+        (inUl && /^[-•]\s+/.test(nextNonEmpty))
+      );
+      if (!listContinues) {
+        if (inOl) { result.push("</ol>"); inOl = false; }
+        if (inUl) { result.push("</ul>"); inUl = false; }
+      }
+      if (!inOl && !inUl) {
+        result.push('<div style="height:12px"></div>');
+      }
+      continue;
+    }
+
     // Close any open lists on non-list lines
     if (inOl) { result.push("</ol>"); inOl = false; }
     if (inUl) { result.push("</ul>"); inUl = false; }
-
-    // Empty line = paragraph break
-    if (line.trim() === "") {
-      result.push('<div style="height:12px"></div>');
-      continue;
-    }
 
     // Regular text with inline formatting
     line = line.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#eee">$1</strong>');
