@@ -409,10 +409,11 @@ async def deliberate(
         db=None,  # Don't pass db to parallel calls — causes greenlet conflicts
     )
 
-    await storage.save_responses(db, session_id, deliberation_responses, next_round)
-
-    # Return the full updated session
-    return await storage.load_session(db, session_id, user.id)
+    # Use a fresh DB session for save + reload to avoid greenlet issues
+    from database import async_session
+    async with async_session() as fresh_db:
+        await storage.save_responses(fresh_db, session_id, deliberation_responses, next_round)
+        return await storage.load_session(fresh_db, session_id, user.id)
 
 
 @app.post("/session/{session_id}/consensus")
@@ -440,11 +441,12 @@ async def consensus(
         max_round=max_round,
     )
 
-    # Store consensus as a special round (max_round + 1)
+    # Use fresh DB session to avoid greenlet issues
+    from database import async_session
     consensus_round = max_round + 1
-    await storage.save_responses(db, session_id, [consensus_response], consensus_round)
-
-    return await storage.load_session(db, session_id, user.id)
+    async with async_session() as fresh_db:
+        await storage.save_responses(fresh_db, session_id, [consensus_response], consensus_round)
+        return await storage.load_session(fresh_db, session_id, user.id)
 
 
 # ---------- streaming session (SSE) ----------

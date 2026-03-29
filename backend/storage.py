@@ -37,10 +37,6 @@ async def save_session(db: AsyncSession, session_data: dict[str, Any], user_id: 
 async def save_responses(
     db: AsyncSession, session_id: str, responses: list[dict[str, Any]], round_num: int
 ) -> None:
-    try:
-        await db.rollback()  # Clear any failed transaction state
-    except Exception:
-        pass
     for r in responses:
         resp = SessionResponse(
             session_id=session_id,
