@@ -2,11 +2,50 @@ import React from "react";
 import type { AdvisorResponse, Session } from "../types";
 
 /**
- * Render text with [Citation] patterns styled as inline badges.
- * Matches patterns like [Source Title], [Berkshire 2023 Letter], etc.
+ * Simple markdown to HTML converter. Handles headers, bold, italic, lists, paragraphs.
+ * No external dependencies.
  */
+function markdownToHtml(text: string): string {
+  let html = text
+    // Escape HTML entities
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    // Headers (## and ###)
+    .replace(/^### (.+)$/gm, '<h4 style="margin:16px 0 8px;font-size:14px;font-weight:700;color:#ddd">$1</h4>')
+    .replace(/^## (.+)$/gm, '<h3 style="margin:20px 0 10px;font-size:16px;font-weight:700;color:#eee">$1</h3>')
+    // Bold
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#eee">$1</strong>')
+    // Italic
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Numbered lists
+    .replace(/^(\d+)\.\s+(.+)$/gm, '<li style="margin:4px 0;margin-left:20px;list-style-type:decimal">$2</li>')
+    // Bullet lists
+    .replace(/^[-•]\s+(.+)$/gm, '<li style="margin:4px 0;margin-left:20px;list-style-type:disc">$1</li>')
+    // Citations [Source Title]
+    .replace(/\[([^\]]{4,})\](?!\()/g, '<span style="display:inline;background:rgba(124,58,237,0.15);color:#C4B5FD;font-size:12px;padding:1px 7px;border-radius:4px;font-weight:500;white-space:nowrap">$1</span>')
+    // Paragraphs (double newlines)
+    .replace(/\n\n/g, '</p><p style="margin:8px 0">')
+    // Single newlines (within paragraphs, keep as breaks)
+    .replace(/\n/g, '<br/>');
+
+  return '<p style="margin:8px 0">' + html + '</p>';
+}
+
+/**
+ * Render markdown text as formatted HTML with citations styled as inline badges.
+ */
+function renderMarkdown(text: string): JSX.Element {
+  return (
+    <div
+      dangerouslySetInnerHTML={{ __html: markdownToHtml(text) }}
+      style={{ lineHeight: 1.7 }}
+    />
+  );
+}
+
+/* Legacy citation renderer kept for reference */
 function renderWithCitations(text: string): (string | JSX.Element)[] {
-  // Match [Text] but exclude markdown-style links [text](url) and common markdown like [x]
   const parts = text.split(/(\[[^\]]{4,}\])(?!\()/g);
   return parts.map((part, i) => {
     if (part.startsWith("[") && part.endsWith("]") && part.length > 5) {
@@ -164,10 +203,9 @@ function ResponseCard({
           fontSize: 14,
           lineHeight: 1.7,
           color: "#ccc",
-          whiteSpace: "pre-wrap",
         }}
       >
-        {renderWithCitations(r.response)}
+        {renderMarkdown(r.response)}
       </div>
     </div>
   );
